@@ -1,0 +1,15 @@
+Manifest-Version: 1.0
+Class-Path: lib/tika-core-1.13.jar lib/javax.servlet-api-3.1.0.jar lib
+ /lucene-core-7.1.0.jar lib/jetty-util-9.3.22.v20171030.jar lib/h2-1.4
+ .196.jar lib/jetty-server-9.3.22.v20171030.jar lib/lucene-analyzers-c
+ ommon-7.1.0.jar lib/tika-parsers-1.13.jar lib/weupnp-0.1.4.jar lib/sl
+ f4j-jdk14-1.7.22.jar lib/core-3.3.0.jar lib/json-simple-1.1.1.jar lib
+ /jetty-security-9.3.22.v20171030.jar lib/jetty-continuation-9.3.22.v2
+ 0171030.jar lib/jetty-servlet-9.3.22.v20171030.jar lib/lucene-querypa
+ rser-7.1.0.jar lib/jetty-io-9.3.22.v20171030.jar lib/jetty-servlets-9
+ .3.22.v20171030.jar lib/lucene-queries-7.1.0.jar lib/jetty-client-9.3
+ .22.v20171030.jar lib/bcprov-jdk15on-159.jar lib/javase-3.3.0.jar lib
+ /slf4j-api-1.7.22.jar lib/jetty-http-9.3.22.v20171030.jar lib/jetty-p
+ roxy-9.3.22.v20171030.jar conf/
+Main-Class: nxt.Nxt
+

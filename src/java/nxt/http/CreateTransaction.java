@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2017 Jelurida IP B.V.
+ * Copyright © 2016-2018 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -38,6 +38,8 @@ import nxt.messaging.PrunableEncryptedMessageAppendix;
 import nxt.messaging.PrunablePlainMessageAppendix;
 import nxt.peer.Peers;
 import nxt.util.Convert;
+import nxt.util.JSON;
+import nxt.util.Logger;
 import nxt.voting.PhasingAppendix;
 import nxt.voting.PhasingParams;
 import org.json.simple.JSONObject;
@@ -243,10 +245,20 @@ abstract class CreateTransaction extends APIServlet.APIRequestHandler {
             }
             Transaction transaction = builder.build(secretPhrase);
             try {
-                if (Math.addExact(amountNQT, transaction.getFee()) > chain.getBalanceHome().getBalance(senderAccount.getId()).getUnconfirmedBalance()) {
-                    return NOT_ENOUGH_FUNDS;
+                long balance = chain.getBalanceHome().getBalance(senderAccount.getId()).getUnconfirmedBalance();
+                if (Math.addExact(amountNQT, transaction.getFee()) > balance) {
+                    JSONObject infoJson = new JSONObject();
+                    infoJson.put("errorCode", 6);
+                    infoJson.put("errorDescription", "Not enough funds");
+                    infoJson.put("amount", String.valueOf(amountNQT));
+                    infoJson.put("fee", String.valueOf(transaction.getFee()));
+                    infoJson.put("balance", String.valueOf(balance));
+                    infoJson.put("diff", String.valueOf(Math.subtractExact(Math.addExact(amountNQT, transaction.getFee()), balance)));
+                    infoJson.put("chain", chain.getId());
+                    return JSON.prepare(infoJson);
                 }
             } catch (ArithmeticException e) {
+                Logger.logErrorMessage(String.format("amount %d fee %d", amountNQT, transaction.getFee()), e);
                 return NOT_ENOUGH_FUNDS;
             }
             JSONObject transactionJSON = JSONData.unconfirmedTransaction(transaction);
@@ -259,6 +271,7 @@ abstract class CreateTransaction extends APIServlet.APIRequestHandler {
                 response.put("transactionBytes", Convert.toHexString(transaction.getBytes()));
                 response.put("signatureHash", transactionJSON.get("signatureHash"));
             }
+            response.put("minimumFeeFQT", String.valueOf(transaction.getMinimumFeeFQT()));
             if (broadcast) {
                 Nxt.getTransactionProcessor().broadcast(transaction);
                 response.put("broadcasted", true);

@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2017 Jelurida IP B.V.
+ * Copyright © 2016-2018 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -19,7 +19,6 @@ package nxt.http;
 import nxt.Constants;
 import nxt.util.Convert;
 
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -133,11 +132,7 @@ public class APITestServlet extends HttpServlet {
             String requestType = entry.getKey();
             Set<APITag> apiTags = entry.getValue().getAPITags();
             for (APITag apiTag : apiTags) {
-                SortedSet<String> set = requestTags.get(apiTag.name());
-                if (set == null) {
-                    set = new TreeSet<>();
-                    requestTags.put(apiTag.name(), set);
-                }
+                SortedSet<String> set = requestTags.computeIfAbsent(apiTag.name(), k -> new TreeSet<>());
                 set.add(requestType);
             }
         }
@@ -171,7 +166,7 @@ public class APITestServlet extends HttpServlet {
         return buf.toString();
     }
 
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
 
         resp.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, private");
         resp.setHeader("Pragma", "no-cache");
@@ -318,11 +313,12 @@ public class APITestServlet extends HttpServlet {
         buf.append("</div>\n");
         buf.append("<div class='col-xs-12 col-lg-6' style='min-width: 50%;'>\n");
         buf.append("<h5 style='margin-top:0px;'>\n");
-        if (!requirePost) {
-            buf.append("<span style='float:right;' class='uri-link'>");
+        if (requirePost) {
+            buf.append("<span style='float:right;' class='postman-link'>");
             buf.append("</span>\n");
         } else {
-            buf.append("<span style='float:right;font-size:12px;font-weight:normal;'>POST only</span>\n");
+            buf.append("<span style='float:right;' class='uri-link'>");
+            buf.append("</span>\n");
         }
         buf.append("Response</h5>\n");
         buf.append("<pre class='hljs json'><code class='result'>JSON response</code></pre>\n");

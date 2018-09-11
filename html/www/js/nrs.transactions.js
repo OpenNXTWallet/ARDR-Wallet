@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2017 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2018 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -611,9 +611,9 @@ var NRS = (function(NRS, $, undefined) {
 		}
 		var formattedAmount = "";
 		if (amount != "") {
-			formattedAmount = NRS.formatAmount(amount, false, false, decimals.amount);
+			formattedAmount = NRS.formatAmount(amount, false, false, decimals.amount, parseInt(NRS.getChainDecimals(t.chain)));
 		}
-		var formattedFee = NRS.formatAmount(fee, false, false, decimals.fee);
+		var formattedFee = NRS.formatAmount(fee, false, false, decimals.fee, parseInt(NRS.getChainDecimals(t.chain)));
 		var amountColor = (sign == 1 ? "color:green;" : (sign == -1 ? "color:red;" : "color:black;"));
 		var hasMessage = false;
 

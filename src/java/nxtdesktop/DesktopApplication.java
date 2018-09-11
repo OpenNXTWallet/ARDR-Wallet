@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2017 Jelurida IP B.V.
+ * Copyright © 2016-2018 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -55,7 +55,6 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -74,7 +73,6 @@ public class DesktopApplication extends Application {
     private static volatile WebEngine webEngine;
     private JSObject nrs;
     private volatile long updateTime;
-    private volatile List<Transaction> unconfirmedTransactionUpdates = new ArrayList<>();
     private JavaScriptBridge javaScriptBridge;
 
     public static void launch() {
@@ -121,7 +119,7 @@ public class DesktopApplication extends Application {
     }
 
     @Override
-    public void start(Stage stage) throws Exception {
+    public void start(Stage stage) {
         DesktopApplication.stage = stage;
         Rectangle2D primaryScreenBounds = Screen.getPrimary().getVisualBounds();
         WebView browser = new WebView();
@@ -156,10 +154,10 @@ public class DesktopApplication extends Application {
                     BlockchainProcessor blockchainProcessor = Nxt.getBlockchainProcessor();
                     blockchainProcessor.addListener((block) ->
                             updateClientState(BlockchainProcessor.Event.BLOCK_PUSHED, block), BlockchainProcessor.Event.BLOCK_PUSHED);
-                    blockchainProcessor.addListener((block) ->
-                            updateClientState(BlockchainProcessor.Event.AFTER_BLOCK_APPLY, block), BlockchainProcessor.Event.AFTER_BLOCK_APPLY);
                     Nxt.getTransactionProcessor().addListener(transaction ->
                             updateClientState(TransactionProcessor.Event.ADDED_UNCONFIRMED_TRANSACTIONS, transaction), TransactionProcessor.Event.ADDED_UNCONFIRMED_TRANSACTIONS);
+                    Nxt.getTransactionProcessor().addListener(transaction ->
+                            updateClientState(TransactionProcessor.Event.REMOVED_UNCONFIRMED_TRANSACTIONS, transaction), TransactionProcessor.Event.REMOVED_UNCONFIRMED_TRANSACTIONS);
 
                     if (ENABLE_JAVASCRIPT_DEBUGGER) {
                         try {
@@ -202,18 +200,8 @@ public class DesktopApplication extends Application {
     }
 
     private void updateClientState(BlockchainProcessor.Event blockEvent, Block block) {
-        BlockchainProcessor blockchainProcessor = Nxt.getBlockchainProcessor();
-        if (blockEvent == BlockchainProcessor.Event.BLOCK_PUSHED && blockchainProcessor.isDownloading()) {
-            if (!(block.getHeight() % 100 == 0)) {
-                return;
-            }
-        }
-        if (blockEvent == BlockchainProcessor.Event.AFTER_BLOCK_APPLY) {
-            if (blockchainProcessor.isScanning()) {
-                if (!(block.getHeight() % 100 == 0)) {
-                    return;
-                }
-            } else {
+        if (Nxt.getBlockchainProcessor().isDownloading()) {
+            if (System.currentTimeMillis() - updateTime < 10000L) {
                 return;
             }
         }
@@ -222,19 +210,14 @@ public class DesktopApplication extends Application {
     }
 
     private void updateClientState(TransactionProcessor.Event transactionEvent, List<? extends Transaction> transactions) {
-        if (transactions.size() == 0) {
-            return;
-        }
-        unconfirmedTransactionUpdates.addAll(transactions);
         if (System.currentTimeMillis() - updateTime > 3000L) {
-            String msg = transactionEvent.toString() + " ids " + unconfirmedTransactionUpdates.stream().map(Transaction::getStringId).collect(Collectors.joining(","));
-            updateTime = System.currentTimeMillis();
-            unconfirmedTransactionUpdates = new ArrayList<>();
+            String msg = transactionEvent.toString() + " ids " + transactions.stream().map(Transaction::getStringId).collect(Collectors.joining(","));
             updateClientState(msg);
         }
     }
 
     private void updateClientState(String msg) {
+        updateTime = System.currentTimeMillis();
         Platform.runLater(() -> webEngine.executeScript("NRS.getState(null, '" + msg + "')"));
     }
 

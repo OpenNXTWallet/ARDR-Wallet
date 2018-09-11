@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2017 Jelurida IP B.V.
+ * Copyright © 2016-2018 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -14,6 +14,8 @@
  *
  */
 package nxt;
+
+import nxt.util.Convert;
 
 import java.math.BigInteger;
 import java.text.SimpleDateFormat;
@@ -152,14 +154,15 @@ public final class Constants {
     public static final int MAX_TAGGED_DATA_DATA_LENGTH = 42 * 1024;
 
     public static final int MAX_REFERENCED_TRANSACTION_TIMESPAN = 60 * 1440 * 60;
-    public static final int CHECKSUM_BLOCK_1 = Integer.MAX_VALUE;
+    public static final int CHECKSUM_BLOCK_1 = Constants.isTestnet ? 17000 : 6000;
 
-    public static final int LAST_CHECKSUM_BLOCK = 0;
-    // LAST_KNOWN_BLOCK must also be set in html/www/js/nrs.constants.js
-    public static final int LAST_KNOWN_BLOCK = isTestnet ? 0 : 0;
+    public static final int LAST_CHECKSUM_BLOCK = CHECKSUM_BLOCK_1;
 
-    public static final int[] MIN_VERSION = new int[] {2, 0, 9};
-    public static final int[] MIN_PROXY_VERSION = new int[] {2, 0, 9};
+    public static final int LAST_KNOWN_BLOCK = CHECKSUM_BLOCK_1;
+    public static final long LAST_KNOWN_BLOCK_ID = Convert.parseUnsignedLong(isTestnet ? "7136116332013816990" : "5659382559739578917");
+
+    public static final int[] MIN_VERSION = new int[] {2, 0, 10};
+    public static final int[] MIN_PROXY_VERSION = new int[] {2, 0, 10};
 
     public static final long UNCONFIRMED_POOL_DEPOSIT_FQT = 10 * ONE_FXT;
 

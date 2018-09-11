@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2017 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2018 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -21,7 +21,7 @@ jQuery.t = function(text) {
 QUnit.module("nrs.encryption");
 
 QUnit.test("generatePublicKey", function (assert) {
-    assert.throws(function() { NRS.generatePublicKey("") }, { message: "error_generate_public_key_no_password" }, "empty.public.key");
+    assert.throws(function() { NRS.generatePublicKey("") }, { message: "Can't generate public key without the user's password." }, "empty.public.key");
     assert.equal(NRS.generatePublicKey("12345678"), "a65ae5bc3cdaa9a0dd66f2a87459bbf663140060e99ae5d4dfe4dbef561fdd37", "public.key");
     assert.equal(NRS.generatePublicKey("hope peace happen touch easy pretend worthless talk them indeed wheel state"), "112e0c5748b5ea610a44a09b1ad0d2bddc945a6ef5edc7551b80576249ba585b", "public.key");
 });
@@ -32,7 +32,7 @@ QUnit.test("getPublicKey", function (assert) {
 });
 
 QUnit.test("getAccountIdFromPublicKey", function (assert) {
-    assert.equal(NRS.getAccountIdFromPublicKey("112e0c5748b5ea610a44a09b1ad0d2bddc945a6ef5edc7551b80576249ba585b", true), "NXT-XK4R-7VJU-6EQG-7R335", "account.rs");
+    assert.equal(NRS.getAccountIdFromPublicKey("112e0c5748b5ea610a44a09b1ad0d2bddc945a6ef5edc7551b80576249ba585b", true), "ARDOR-XK4R-7VJU-6EQG-7R335", "account.rs");
     assert.equal(NRS.getAccountIdFromPublicKey("112e0c5748b5ea610a44a09b1ad0d2bddc945a6ef5edc7551b80576249ba585b", false), "5873880488492319831", "account.rs");
 });
 
@@ -159,3 +159,11 @@ QUnit.test("decryptUncompressedBinary", function (assert) {
     assert.equal(converters.byteArrayToString(converters.hexStringToByteArray(decryptedMessage.message)).substring(0, 11), "hello world");
 });
 
+QUnit.test("signAndVerify", function(assert) {
+    var message = "0200000001000169fc25000f00584486d2ba4dbd7eaeadd071f9f8c3593cee620e1e374033551147d68899b5296589cd7b584899c8000000000000000020a107000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000684200009e0c8cc5fe930863080000000100be3eea9a483308cb3134ce068e77b56e7c25af19480742880179827cb3c9b5c0000000000000000000000000000000000000000000000000000000000000000000000000";
+    var secretPhrase = "356869696739425064596f427a576e693051506143446e6f36577a305667386f5839794d6358526a45686d6b75514b687642";
+    var signature = NRS.signBytes(message, secretPhrase);
+    assert.equal(signature, "aad6cd4bfe73eb39d42f549bce8f14b80a49e12cfebc0a9ce362876deb50c40609583f9b4e8fbbc45270f63947b1102457b10f9127f731f7a96891b8fdd8441f", "sign.message");
+    var publicKey = "584486d2ba4dbd7eaeadd071f9f8c3593cee620e1e374033551147d68899b529";
+    assert.equal(NRS.verifySignature(signature, message, publicKey), true, "verify.signature");
+});

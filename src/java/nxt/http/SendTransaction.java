@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2017 Jelurida IP B.V.
+ * Copyright © 2016-2018 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -16,7 +16,6 @@
 
 package nxt.http;
 
-import nxt.Nxt;
 import nxt.NxtException;
 import nxt.blockchain.Transaction;
 import nxt.peer.NetworkHandler;
@@ -76,9 +75,12 @@ public final class SendTransaction extends APIServlet.APIRequestHandler {
             Transaction transaction = builder.build();
             List<Transaction> transactions = Collections.singletonList(transaction);
             TransactionsInventory.cacheTransactions(transactions);
-            NetworkHandler.broadcastMessage(new NetworkMessage.TransactionsInventoryMessage(transactions));
-            Nxt.getTransactionProcessor().broadcastLater(transaction);
+            int numberOfPeers = NetworkHandler.broadcastMessage(new NetworkMessage.TransactionsInventoryMessage(transactions));
+            if (numberOfPeers == 0) {
+                return JSONResponses.error("Not connected to any full client peers");
+            }
             response.put("fullHash", Convert.toHexString(transaction.getFullHash()));
+            response.put("numberOfPeers", numberOfPeers);
         } catch (NxtException.ValidationException|RuntimeException e) {
             JSONData.putException(response, e, "Failed to broadcast transaction");
         }

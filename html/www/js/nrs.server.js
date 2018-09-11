@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2017 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2018 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -234,7 +234,7 @@ var NRS = (function (NRS, $, undefined) {
         //check to see if secretPhrase supplied matches logged in account, if not - show error.
         if ("secretPhrase" in data) {
             accountId = NRS.getAccountId(NRS.rememberPassword ? _password : data.secretPhrase);
-            if (accountId != NRS.account && !data.calculateFee) {
+            if (accountId != NRS.account) {
                 callback({
                     "errorCode": 1,
                     "errorDescription": $.t("error_passphrase_incorrect")
@@ -329,7 +329,7 @@ var NRS = (function (NRS, $, undefined) {
                 data.publicKey = NRS.generatePublicKey(secretPhrase);
                 NRS.accountInfo.publicKey = data.publicKey;
             }
-            var ecBlock = NRS.getECBlock(NRS.isTestNet);
+            var ecBlock = NRS.constants.LAST_KNOWN_BLOCK;
             data.ecBlockId = ecBlock.id;
             data.ecBlockHeight = ecBlock.height;
         } else if (httpMethod == "POST" && NRS.rememberPassword) {
@@ -434,7 +434,7 @@ var NRS = (function (NRS, $, undefined) {
                 NRS.confirmResponse(requestType, data, response, requestRemoteNode);
             }
             if (!options.doNotEscape) {
-                NRS.escapeResponseObjStrings(response);
+                NRS.escapeResponseObjStrings(response, ["transactionJSON"]);
             }
             if (NRS.console) {
                 NRS.addToConsole(this.url, this.type, this.data, response);
@@ -443,8 +443,7 @@ var NRS = (function (NRS, $, undefined) {
             if (secretPhrase &&
                 response.unsignedTransactionBytes && !data.doNotSign &&
                 !response.errorCode && !response.error &&
-                !response.bundlerRateNQTPerFXT && !data.calculateFee
-            ) {
+                !response.bundlerRateNQTPerFXT && !data.calculateFee) {
                 var publicKey = NRS.generatePublicKey(secretPhrase);
                 var signature = NRS.signBytes(response.unsignedTransactionBytes, converters.stringToHexString(secretPhrase));
 
@@ -452,16 +451,16 @@ var NRS = (function (NRS, $, undefined) {
                     return;
                 }
                 addMissingData(data);
-                if (file) {
+                if (file && NRS.isFileReaderSupported()) {
                     var r = new FileReader();
                     r.onload = function (e) {
                         data.filebytes = e.target.result;
                         data.filename = file.name;
-                        NRS.verifyAndBroadcast(response.unsignedTransactionBytes, signature, requestType, data, callback, response, extra, isVolatile);
+                        NRS.verifyAndBroadcast(signature, requestType, data, callback, response, extra, isVolatile);
                     };
                     r.readAsArrayBuffer(file);
                 } else {
-                    NRS.verifyAndBroadcast(response.unsignedTransactionBytes, signature, requestType, data, callback, response, extra, isVolatile);
+                    NRS.verifyAndBroadcast(signature, requestType, data, callback, response, extra, isVolatile);
                 }
             } else {
                 if (response.errorCode || response.errorDescription || response.errorMessage || response.error) {
@@ -479,7 +478,7 @@ var NRS = (function (NRS, $, undefined) {
                                 if (!response.unsignedTransactionBytes) {
                                     callback(null);
                                 }
-                                if (file) {
+                                if (file && NRS.isFileReaderSupported()) {
                                     var r = new FileReader();
                                     r.onload = function (e) {
                                         data.filebytes = e.target.result;
@@ -549,9 +548,9 @@ var NRS = (function (NRS, $, undefined) {
         });
     };
 
-    NRS.verifyAndBroadcast = function (transactionBytes, signature, requestType, data, callback, response, extra, isVerifyECBlock) {
-        var byteArray = converters.hexStringToByteArray(transactionBytes);
-        if (!NRS.verifyTransactionBytes(byteArray, requestType, data, response.transactionJSON.attachment, isVerifyECBlock)) {
+    NRS.verifyAndBroadcast = function (signature, requestType, data, callback, response, extra, isVerifyECBlock) {
+        var transactionBytes = response.unsignedTransactionBytes;
+        if (!NRS.verifyTransactionBytes(converters.hexStringToByteArray(transactionBytes), requestType, data, response.transactionJSON.attachment, isVerifyECBlock)) {
             callback({
                 "errorCode": 1,
                 "errorDescription": $.t("error_bytes_validation_server")
@@ -608,7 +607,7 @@ var NRS = (function (NRS, $, undefined) {
             transaction.flags = String(converters.byteArrayToSignedInt32(byteArray, pos));
             pos += 4;
             if (isVerifyECBlock) {
-                var ecBlock = NRS.getECBlock(NRS.isTestNet);
+                var ecBlock = NRS.constants.LAST_KNOWN_BLOCK;
                 if (transaction.ecBlockHeight != ecBlock.height) {
                     return false;
                 }
@@ -983,7 +982,8 @@ var NRS = (function (NRS, $, undefined) {
                     return false;
                 }
                 pos += 8;
-                if (validatePhasingData(data, byteArray, pos) == -1) {
+                pos = validateControlPhasingData(data, byteArray, pos, false);
+                if (pos == -1) {
                     return false;
                 }
                 break;
@@ -1124,7 +1124,8 @@ var NRS = (function (NRS, $, undefined) {
                 if (NRS.notOfType(transaction, "SetPhasingOnly")) {
                     return false;
                 }
-                if (validatePhasingData(data, byteArray, pos) == -1) {
+                pos = validateControlPhasingData(data, byteArray, pos, true);
+                if (pos == -1) {
                     return false;
                 }
                 break;
@@ -1656,91 +1657,16 @@ var NRS = (function (NRS, $, undefined) {
             if (params.phasingVotingModel == NRS.constants.VOTING_MODELS.HASH) {
                 var hashedSecretLength = byteArray[pos];
                 pos++;
-                if (hashedSecretLength > 0 && converters.byteArrayToHexString(byteArray.slice(pos, pos + hashedSecretLength)) !== data.phasingParams.phasingHashedSecret) {
+                if (hashedSecretLength > 0 && converters.byteArrayToHexString(byteArray.slice(pos, pos + hashedSecretLength)) !== params.phasingHashedSecret) {
                     return false;
                 }
                 pos += hashedSecretLength;
                 var algorithm = String(byteArray[pos]);
-                if (algorithm !== "0" && algorithm !== data.phasingHashedSecretAlgorithm) {
+                if (algorithm !== "0" && algorithm != params.phasingHashedSecretAlgorithm) {
                     return false;
                 }
             }
-            if (params.phasingVotingModel == NRS.constants.VOTING_MODELS.PROPERTY) {
-                if (params.phasingSenderProperty === undefined) {
-                    if (String(converters.byteArrayToBigInteger(byteArray, pos)) !== "0") {
-                        return false;
-                    }
-                    pos += 8;
-                    if (byteArray[pos] !== 0) {
-                        return false;
-                    }
-                    pos++;
-                    if (byteArray[pos] !== 0) {
-                        return false;
-                    }
-                    pos++;
-                } else {
-                    if (String(converters.byteArrayToBigInteger(byteArray, pos)) !== params.phasingSenderProperty.setter) {
-                        return false;
-                    }
-                    pos += 8;
-                    var length = byteArray[pos];
-                    pos++;
-                    if (converters.byteArrayToString(byteArray, pos, length) !== params.phasingSenderProperty.name) {
-                        return false;
-                    }
-                    pos += length;
-                    length = byteArray[pos];
-                    pos++;
-                    if (params.phasingSenderProperty.value === undefined) {
-                        if (length !== 0) {
-                            return false;
-                        }
-                    } else {
-                        if (converters.byteArrayToString(byteArray, pos, length) !== params.phasingSenderProperty.value) {
-                            return false;
-                        }
-                    }
-                    pos += length;
-                }
-                if (params.phasingRecipientProperty === undefined) {
-                    if (String(converters.byteArrayToBigInteger(byteArray, pos)) !== "0") {
-                        return false;
-                    }
-                    pos += 8;
-                    if (byteArray[pos] !== 0) {
-                        return false;
-                    }
-                    pos++;
-                    if (byteArray[pos] !== 0) {
-                        return false;
-                    }
-                    pos++;
-                } else {
-                    if (String(converters.byteArrayToBigInteger(byteArray, pos)) !== params.phasingRecipientProperty.setter) {
-                        return false;
-                    }
-                    pos += 8;
-                    length = byteArray[pos];
-                    pos++;
-                    if (converters.byteArrayToString(byteArray, pos, length) !== params.phasingRecipientProperty.name) {
-                        return false;
-                    }
-                    pos += length;
-                    length = byteArray[pos];
-                    pos++;
-                    if (params.phasingRecipientProperty.value === undefined) {
-                        if (length !== 0) {
-                            return false;
-                        }
-                    } else {
-                        if (converters.byteArrayToString(byteArray, pos, length) !== params.phasingRecipientProperty.value) {
-                            return false;
-                        }
-                    }
-                    pos += length;
-                }
-            }
+
             if (params.phasingVotingModel == NRS.constants.VOTING_MODELS.COMPOSITE) {
                 pos = validateCompositePhasingData(byteArray, pos, params);
                 if (pos == -1) {
@@ -1856,7 +1782,7 @@ var NRS = (function (NRS, $, undefined) {
         }
     }
 
-    function validatePhasingData(data, byteArray, pos) {
+    function validateControlPhasingData(data, byteArray, pos, hasFeeBurningData) {
         var params;
         if (byteArray[pos] == 0xFF) {
             // Removal of account control
@@ -1878,28 +1804,30 @@ var NRS = (function (NRS, $, undefined) {
                 return -1;
             }
         }
-        var maxFeesSize = byteArray[pos];
-        pos++;
-        for (var i = 0; i < maxFeesSize; i++) {
-            // for now the client can only submit 0 or 1 control fees
-            // in case this is ever enhanced, we'll need to revisit this code
-            var controlMaxFees = String(converters.byteArrayToSignedInt32(byteArray, pos));
-            pos += 4;
-            controlMaxFees += ":" + String(converters.byteArrayToBigInteger(byteArray, pos));
-            pos += 8;
-            if (controlMaxFees != data.controlMaxFees) {
+        if (hasFeeBurningData) {
+            var maxFeesSize = byteArray[pos];
+            pos++;
+            for (var i = 0; i < maxFeesSize; i++) {
+                // for now the client can only submit 0 or 1 control fees
+                // in case this is ever enhanced, we'll need to revisit this code
+                var controlMaxFees = String(converters.byteArrayToSignedInt32(byteArray, pos));
+                pos += 4;
+                controlMaxFees += ":" + String(converters.byteArrayToBigInteger(byteArray, pos));
+                pos += 8;
+                if (controlMaxFees != data.controlMaxFees) {
+                    return -1;
+                }
+            }
+            var minDuration = converters.byteArrayToSignedShort(byteArray, pos);
+            pos += 2;
+            if (data.controlMinDuration && minDuration != data.controlMinDuration) {
                 return -1;
             }
-        }
-        var minDuration = converters.byteArrayToSignedShort(byteArray, pos);
-        pos += 2;
-        if (data.controlMinDuration && minDuration != data.controlMinDuration) {
-            return -1;
-        }
-        var maxDuration = converters.byteArrayToSignedShort(byteArray, pos);
-        pos += 2;
-        if (data.controlMaxDuration && maxDuration != data.controlMaxDuration) {
-            return -1;
+            var maxDuration = converters.byteArrayToSignedShort(byteArray, pos);
+            pos += 2;
+            if (data.controlMaxDuration && maxDuration != data.controlMaxDuration) {
+                return -1;
+            }
         }
         return pos;
     }
@@ -1939,6 +1867,84 @@ var NRS = (function (NRS, $, undefined) {
             return -1;
         }
         pos++;
+
+        if (params.phasingVotingModel == NRS.constants.VOTING_MODELS.PROPERTY) {
+            if (params.phasingSenderProperty === undefined) {
+                if (String(converters.byteArrayToBigInteger(byteArray, pos)) !== "0") {
+                    return false;
+                }
+                pos += 8;
+                if (byteArray[pos] !== 0) {
+                    return false;
+                }
+                pos++;
+                if (byteArray[pos] !== 0) {
+                    return false;
+                }
+                pos++;
+            } else {
+                if (String(converters.byteArrayToBigInteger(byteArray, pos)) !== params.phasingSenderProperty.setter) {
+                    return false;
+                }
+                pos += 8;
+                var length = byteArray[pos];
+                pos++;
+                if (converters.byteArrayToString(byteArray, pos, length) !== params.phasingSenderProperty.name) {
+                    return false;
+                }
+                pos += length;
+                length = byteArray[pos];
+                pos++;
+                if (params.phasingSenderProperty.value === undefined) {
+                    if (length !== 0) {
+                        return false;
+                    }
+                } else {
+                    if (converters.byteArrayToString(byteArray, pos, length) !== params.phasingSenderProperty.value) {
+                        return false;
+                    }
+                }
+                pos += length;
+            }
+            if (params.phasingRecipientProperty === undefined) {
+                if (String(converters.byteArrayToBigInteger(byteArray, pos)) !== "0") {
+                    return false;
+                }
+                pos += 8;
+                if (byteArray[pos] !== 0) {
+                    return false;
+                }
+                pos++;
+                if (byteArray[pos] !== 0) {
+                    return false;
+                }
+                pos++;
+            } else {
+                if (String(converters.byteArrayToBigInteger(byteArray, pos)) !== params.phasingRecipientProperty.setter) {
+                    return false;
+                }
+                pos += 8;
+                length = byteArray[pos];
+                pos++;
+                if (converters.byteArrayToString(byteArray, pos, length) !== params.phasingRecipientProperty.name) {
+                    return false;
+                }
+                pos += length;
+                length = byteArray[pos];
+                pos++;
+                if (params.phasingRecipientProperty.value === undefined) {
+                    if (length !== 0) {
+                        return false;
+                    }
+                } else {
+                    if (converters.byteArrayToString(byteArray, pos, length) !== params.phasingRecipientProperty.value) {
+                        return false;
+                    }
+                }
+                pos += length;
+            }
+        }
+
         return pos;
     }
 

@@ -1,16 +1,17 @@
-# ARDR Wallet: Version 2.0.10
+# ARDR Wallet: Version 2.0.14
 
 For some Automations Processes we need the ARDR Client on GitHub.
 Fell free to use it, to make things easier.
 
-If you do not trust this Repository, you can find the Actual Version here: https://www.jelurida.com/
+If you do not trust this Repository, you can find the actual Version here: https://www.jelurida.com/
 
 # Attention
 We are NOT affiliated with, funded, or in any way associated with the organization known as NXT FOUNDATION.
 
-----
+You can find hosted Wallet under: https://ardr.open-nxt-allet.eu:27876/
 
 ----
+
 # Welcome to Ardor! #
 
 ----
@@ -47,7 +48,7 @@ in such a way that no trusted third parties are required anymore.
   - Window: `run.bat`
 
   - wait for the JavaFX wallet window to open
-  - on platforms without JavaFX, open http://localhost:26876/ in a browser
+  - on platforms without JavaFX, open http://localhost:27876/ in a browser
 
 ----
 ## Compile it! ##

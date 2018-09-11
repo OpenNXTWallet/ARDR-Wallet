@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2017 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2018 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -341,6 +341,7 @@ var NRS = (function(NRS, $, undefined) {
 					$(this).popover("destroy");
 					$(".popover").remove();
 				});
+                $(".coin-symbol-separator").html(" " + $.t("per") + " ");
 
 				_fix();
 
@@ -718,7 +719,9 @@ var NRS = (function(NRS, $, undefined) {
 		if (callback) {
 			try {
                 callback();
-            } catch(e) { /* ignore since sometimes callback is not a function */ }
+            } catch(e) {
+				NRS.logException(e);
+			}
 		}
 	};
 
@@ -1145,7 +1148,7 @@ var NRS = (function(NRS, $, undefined) {
         });
     };
 
-    NRS.getBalances = function(balances, isAsync) {
+    function getAccountBalances() {
         // Currently there is no way to get balances for all chains, so we need to specify each chain separately
         var qs = [];
         for (var i = 1; i <= Object.keys(NRS.constants.CHAINS).length; i++) {
@@ -1156,10 +1159,9 @@ var NRS = (function(NRS, $, undefined) {
         NRS.sendRequest("getBalances", {
             "querystring": qs
         }, function (response) {
-            balances = response.balances;
-        }, { isAsync: isAsync });
-        return balances;
-    };
+            NRS.accountInfo["balances"] = response.balances;
+        });
+    }
 
     NRS.getAccountInfo = function(firstRun, callback, isAccountSwitch) {
         NRS.sendRequest("getAccount", {
@@ -1190,7 +1192,7 @@ var NRS = (function(NRS, $, undefined) {
                     $("#account_balance, #account_balance_sidebar").html(NRS.formatStyledAmount(balance.unconfirmedBalanceNQT));
                     NRS.accountInfo = $.extend({}, NRS.accountInfo, balance);
                 });
-                NRS.getBalances(NRS.accountInfo["balances"], true);
+                getAccountBalances();
                 if (response.forgedBalanceFQT) {
                     $("#account_forged_balance").html(NRS.formatStyledAmount(response.forgedBalanceFQT));
                 } else {
@@ -1873,7 +1875,7 @@ var NRS = (function(NRS, $, undefined) {
 				});
 			}
 
-            if (NRS.blocks && NRS.blocks.length > 0 && NRS.baseTargetPercent(NRS.blocks[0]) > 1000 && !NRS.isTestNet) {
+            if (NRS.blocks && NRS.blocks.length > 0 && NRS.baseTargetPercent(NRS.blocks[0]) > 1500 && !NRS.isTestNet) {
                 $.growl($.t("fork_warning_base_target"), {
                     "type": "danger"
                 });
@@ -2027,8 +2029,10 @@ var NRS = (function(NRS, $, undefined) {
 if (isNode) {
     module.exports = NRS;
 } else {
-    $(document).ready(function() {
-        console.log("document.ready");
-        NRS.init();
-    });
+	if (!window.isUnitTest) {
+        $(document).ready(function() {
+            console.log("document.ready");
+            NRS.init();
+        });
+    }
 }

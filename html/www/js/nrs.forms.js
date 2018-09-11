@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2017 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2018 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -44,7 +44,9 @@ var NRS = (function(NRS, $) {
 		try {
 			NRS.submitForm($modal, $btn);
 		} catch(e) {
-			$modal.find(".error_message").html("Form submission error '" + e.message + "' - please report to developers").show();
+        	NRS.logException(e);
+        	var stackTrace = (e.stack ? " " + e.stack : "");
+			$modal.find(".error_message").html("Form submission error '" + e.message + "' - please report to developers" + stackTrace).show();
 			NRS.unlockForm($modal, $btn);
 		}
 	});
@@ -177,7 +179,7 @@ var NRS = (function(NRS, $) {
 					data.messageIsPrunable = "true";
 				} else {
 					data.messageIsText = "true";
-					if (!data.permanent_message && converters.stringToByteArray(data.message).length >= NRS.constants.MIN_PRUNABLE_MESSAGE_LENGTH) {
+					if (!data.permanent_message) {
 						data.messageIsPrunable = "true";
 					}
 				}
@@ -692,7 +694,7 @@ var NRS = (function(NRS, $) {
 		if (response.fullHash) {
 			NRS.unlockForm($modal, $btn);
 			if (data.calculateFee) {
-                updateFee($modal, response.transactionJSON.feeNQT, formFeeCalculationFunction);
+                updateFee($modal, response.transactionJSON, formFeeCalculationFunction);
 				return;
 			}
 
@@ -742,7 +744,7 @@ var NRS = (function(NRS, $) {
 		} else {
 			if (data.calculateFee) {
 				NRS.unlockForm($modal, $btn, false);
-				updateFee($modal, response.transactionJSON.feeNQT, formFeeCalculationFunction);
+				updateFee($modal, response.transactionJSON, formFeeCalculationFunction);
 				return;
 			}
 			var sentToFunction = false;
@@ -799,10 +801,11 @@ var NRS = (function(NRS, $) {
 
 
 
-    function updateFee(modal, feeNQT, formFeeCalculationFunction) {
+    function updateFee(modal, transaction, formFeeCalculationFunction) {
+    	var feeNQT = transaction.feeNQT;
         var feeField = $("#" + modal.attr('id').replace('_modal', '') + "_fee");
         if (typeof formFeeCalculationFunction == 'function') {
-            formFeeCalculationFunction(feeField, feeNQT);
+            formFeeCalculationFunction(feeField, feeNQT, transaction);
         } else {
             feeField.val(NRS.convertToNXT(feeNQT));
         }

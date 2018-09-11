@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2017 Jelurida IP B.V.
+ * Copyright © 2016-2018 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -148,7 +148,7 @@ final class BlockInventory {
                                 Nxt.getBlockchainProcessor().processPeerBlocks(blockList);
                             }
                         }
-                    } catch (BlockchainProcessor.BlockOutOfOrderException ignore) {}
+                    } catch (BlockchainProcessor.BlockOutOfOrderException | BlockchainProcessor.BlockOfLowerDifficultyException ignore) {}
                     if (block.getTimestamp() < Nxt.getEpochTime() + Constants.MAX_TIMEDRIFT) {
                         blockCache.put(block.getId(), block);
                     }

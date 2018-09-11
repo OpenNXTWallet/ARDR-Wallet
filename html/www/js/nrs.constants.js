@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2017 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2018 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -25,7 +25,7 @@ var NRS = (function (NRS, $) {
         'MAX_SHORT_JAVA': 32767,
         'MAX_UNSIGNED_SHORT_JAVA': 65535,
         'MAX_INT_JAVA': 2147483647,
-        'MIN_PRUNABLE_MESSAGE_LENGTH': 28,
+        'MAX_LONG_JAVA': "9223372036854775807",
         'DISABLED_API_ERROR_CODE': 16,
         'MAX_ONE_COIN': 10000000000000000,
 
@@ -60,6 +60,7 @@ var NRS = (function (NRS, $) {
         "MINTING_HASH_ALGORITHMS": {},
         "REQUEST_TYPES": {},
         "API_TAGS": {},
+        'LAST_KNOWN_BLOCK': {},
         "ASSET_EXCHANGE_REQUEST_TYPES": ["transferAsset", "deleteAssetShares", "increaseAssetShares", "placeAskOrder", "placeBidOrder"],
 
         'SERVER': {},
@@ -71,8 +72,6 @@ var NRS = (function (NRS, $) {
         'FORGING': 'forging',
         'NOT_FORGING': 'not_forging',
         'UNKNOWN': 'unknown',
-        'LAST_KNOWN_BLOCK': { id: "1937519087760562771", height: "0" },
-        'LAST_KNOWN_TESTNET_BLOCK': { id: "1318911886063902233", height: "0" },
         'INITIAL_BASE_TARGET': 153722867
     };
 
@@ -120,7 +119,8 @@ var NRS = (function (NRS, $) {
             NRS.constants.DISABLED_APIS = response.disabledAPIs;
             NRS.constants.DISABLED_API_TAGS = response.disabledAPITags;
             NRS.constants.PEER_STATES = response.peerStates;
-            NRS.constants.LAST_KNOWN_BLOCK.id = response.genesisBlockId;
+            NRS.constants.LAST_KNOWN_BLOCK.id = response.lastKnownBlock.id;
+            NRS.constants.LAST_KNOWN_BLOCK.height = response.lastKnownBlock.height;
             NRS.constants.PROXY_NOT_FORWARDED_REQUESTS = response.proxyNotForwardedRequests;
             NRS.constants.CHAINS = response.chains;
             NRS.constants.CHAIN_PROPERTIES = response.chainProperties;
@@ -143,13 +143,17 @@ var NRS = (function (NRS, $) {
         }
     };
 
-    NRS.loadServerConstants = function(resolve) {
+    NRS.loadServerConstants = function(resolve, isUnitTest) {
         function processConstants(response) {
             NRS.processConstants(response, resolve);
         }
-        if (NRS.isMobileApp()) {
+        if (NRS.isMobileApp() || isUnitTest) {
             jQuery.ajaxSetup({ async: false });
-            $.getScript("js/data/constants.js" );
+            if (NRS.mobileSettings && NRS.mobileSettings.is_testnet) {
+                $.getScript("js/data/constants.testnet.js");
+            } else {
+                $.getScript("js/data/constants.mainnet.js");
+            }
             jQuery.ajaxSetup({async: true});
             processConstants(NRS.constants.SERVER);
         } else {
@@ -202,10 +206,6 @@ var NRS = (function (NRS, $) {
 
     NRS.getPeerState = function (code) {
         return getKeyByValue(NRS.constants.PEER_STATES, code);
-    };
-
-    NRS.getECBlock = function(isTestNet) {
-        return isTestNet ? NRS.constants.LAST_KNOWN_TESTNET_BLOCK : NRS.constants.LAST_KNOWN_BLOCK;
     };
 
     NRS.isRequireBlockchain = function(requestType) {

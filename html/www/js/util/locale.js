@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2017 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2018 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -27,27 +27,14 @@ var NRS = (function (NRS) {
 
     NRS.getLocale = function () {
         var lang;
-        if (NRS.settings && NRS.settings['regional_format'] != "default") {
-            lang = NRS.settings['regional_format'];
+        if (NRS.settings && NRS.settings.regional_format && NRS.settings.regional_format != "default") {
+            lang = NRS.settings.regional_format;
         } else {
             lang = window.javaFxLanguage || window.navigator.userLanguage || window.navigator.language;
             if (!LOCALE_DATA[lang]) {
                 if (lang && lang.length == 2) {
                     // Attempt to expand the Chrome two letter language to country specific locale
-                    if (window.navigator.languages) {
-                        var tokens = String(window.navigator.languages).split(",");
-                        for (var i=0; i<tokens.length; i++) {
-                            var separator = tokens[i].indexOf("-");
-                            if (separator == -1) {
-                                continue;
-                            }
-                            if (tokens[i].substring(0, separator) == lang) {
-                                NRS.logConsole("Language " + lang + " resolved to locale " + tokens[i]);
-                                lang = tokens[i];
-                                break;
-                            }
-                        }
-                    }
+                    lang = lang + "-" + lang.toUpperCase();
                 }
                 if (!LOCALE_DATA[lang]) {
                     if (!currentLocale.lang) {

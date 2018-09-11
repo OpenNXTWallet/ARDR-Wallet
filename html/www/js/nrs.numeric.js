@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2017 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2018 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -241,7 +241,7 @@ var NRS = (function (NRS, $) {
         return NRS.formatDecimals(params, no_escaping, zeroPad, NRS.getActiveChainDecimals());
     };
 
-    NRS.formatDecimals = function(params, no_escaping, zeroPad, decimals) {
+    NRS.formatDecimals = function(params, no_escaping, zeroPad, trim) {
         var amount;
         var mantissa;
         if (typeof params != "object") {
@@ -268,15 +268,21 @@ var NRS = (function (NRS, $) {
         var formattedAmount = "";
         var locale = NRS.getLocale();
         var formattedMantissa = params.mantissa.replace(".", locale.decimal);
-        if (zeroPad) {
-            var mantissaLen = formattedMantissa.length;
+        var mantissaLen = formattedMantissa.length;
+        if (mantissaLen > trim + 1) {
+            formattedMantissa = formattedMantissa.substring(0, trim + 1);
+        }
+        if (zeroPad && zeroPad > 0) {
+            mantissaLen = formattedMantissa.length;
+            if (zeroPad > trim) {
+                zeroPad = trim;
+            }
             if (mantissaLen > 0) {
-                formattedMantissa += NRS.getOneCoin(decimals).substr(1, zeroPad - mantissaLen + 1);
-            } else {
-                formattedMantissa += NRS.getOneCoin(decimals).substr(1, zeroPad);
-                if (zeroPad != 0) {
-                    formattedMantissa = locale.decimal + formattedMantissa;
+                if (zeroPad + 1 > mantissaLen) {
+                    formattedMantissa += NRS.getOneCoin(trim).substr(1, zeroPad + 1 - mantissaLen);
                 }
+            } else {
+                formattedMantissa += locale.decimal + NRS.getOneCoin(trim).substr(1, zeroPad);
             }
         }
         for (var i = 0; i < digits.length; i++) {
@@ -294,7 +300,10 @@ var NRS = (function (NRS, $) {
         return output;
     };
 
-    NRS.formatQuantity = function (quantity, decimals, no_escaping, zeroPad) {
+    NRS.formatQuantity = function (quantity, decimals, no_escaping, zeroPad, trim) {
+        if (trim !== undefined) {
+            return NRS.formatDecimals(NRS.convertToQNTf(quantity, decimals, true), no_escaping, zeroPad, trim);
+        }
         return NRS.format(NRS.convertToQNTf(quantity, decimals, true), no_escaping, zeroPad);
     };
 

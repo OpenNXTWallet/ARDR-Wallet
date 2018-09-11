@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2017 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2018 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -423,10 +423,16 @@ var NRS = (function (NRS, $, undefined) {
 		if ($el.length) {
 			$el.empty().append(data);
 		} else {
-			$el = $("#" + NRS.currentPage + "_table");
-			$el.find("tbody").empty().append(data);
-            $el.find('[data-toggle="tooltip"]').tooltip();
-		}
+            try {
+                $el = $("#" + NRS.currentPage + "_table");
+                $el.find("tbody").empty().append(data);
+                $el.find('[data-toggle="tooltip"]').tooltip();
+            } catch (e) {
+                NRS.logException(e);
+                NRS.logConsole("Raw data: " + data);
+                $el.find("tbody").empty().append("<tr><td>Error processing table data: " + e.message + "</td></tr>");
+            }
+        }
 
 		NRS.dataLoadFinished($el);
 
@@ -490,6 +496,11 @@ var NRS = (function (NRS, $, undefined) {
         if (!options) {
             options = {};
         }
+        var orderedData = {};
+        Object.keys(data).sort().forEach(function(key) {
+            orderedData[key] = data[key];
+        });
+        data = orderedData;
         var fixed = options.fixed;
         var chain = options.chain ? NRS.getChain(options.chain) : NRS.getActiveChain();
 		var rows = "";
@@ -705,52 +716,36 @@ var NRS = (function (NRS, $, undefined) {
 				switch (response.errorDescription) {
 					case "Invalid ordinary payment":
 						return $.t("error_invalid_ordinary_payment");
-						break;
 					case "Missing alias name":
 						return $.t("error_missing_alias_name");
-						break;
 					case "Transferring aliases to Genesis account not allowed":
 						return $.t("error_alias_transfer_genesis");
-						break;
 					case "Ask order already filled":
 						return $.t("error_ask_order_filled");
-						break;
 					case "Bid order already filled":
 						return $.t("error_bid_order_filled");
-						break;
 					case "Only text encrypted messages allowed":
 						return $.t("error_encrypted_text_messages_only");
-						break;
 					case "Missing feedback message":
 						return $.t("error_missing_feedback_message");
-						break;
 					case "Only text public messages allowed":
 						return $.t("error_public_text_messages_only");
-						break;
 					case "Purchase does not exist yet or not yet delivered":
 						return $.t("error_purchase_delivery");
-						break;
 					case "Purchase does not exist or is not delivered or is already refunded":
 						return $.t("error_purchase_refund");
-						break;
 					case "Recipient account does not have a public key, must attach a public key announcement":
 						return $.t("error_recipient_no_public_key_announcement");
-						break;
 					case "Transaction is not signed yet":
 						return $.t("error_transaction_not_signed");
-						break;
 					case "Transaction already signed":
 						return $.t("error_transaction_already_signed");
-						break;
 					case "PublicKeyAnnouncement cannot be attached to transactions with no recipient":
 						return $.t("error_public_key_announcement_no_recipient");
-						break;
 					case "Announced public key does not match recipient accountId":
 						return $.t("error_public_key_different_account_id");
-						break;
 					case "Public key for this account has already been announced":
 						return $.t("error_public_key_already_announced");
-						break;
 					default:
 						if (response.errorDescription.indexOf("Alias already owned by another account") != -1) {
 							return $.t("error_alias_owned_by_other_account");
@@ -793,25 +788,18 @@ var NRS = (function (NRS, $, undefined) {
 						} else {
 							return response.errorDescription;
 						}
-
-						break;
 				}
 			case 1:
 				switch (response.errorDescription) {
 					case "This request is only accepted using POST!":
 						return $.t("error_post_only");
-						break;
 					case "Incorrect request":
 						return $.t("error_incorrect_request");
-						break;
 					default:
 						return response.errorDescription;
-						break;
 				}
-				break;
 			case 2:
 				return response.errorDescription;
-				break;
 			case 3:
                 match = response.errorDescription.match(/"([^"]+)" not specified/i);
 				if (match && match[1]) {
@@ -837,7 +825,6 @@ var NRS = (function (NRS, $, undefined) {
                 } else {
                     return response.errorDescription;
                 }
-                break;
             case 4:
                 match = response.errorDescription.match(/Incorrect "(.*)"(.*)/i);
 				if (match && match[1] && match[2]) {
@@ -848,7 +835,6 @@ var NRS = (function (NRS, $, undefined) {
 				} else {
 					return response.errorDescription;
 				}
-				break;
 			case 5:
                 match = response.errorDescription.match(/Unknown (.*)/i);
 				if (match && match[1]) {
@@ -862,63 +848,58 @@ var NRS = (function (NRS, $, undefined) {
 				} else {
 					return response.errorDescription;
 				}
-				break;
 			case 6:
 				switch (response.errorDescription) {
 					case "Not enough assets":
 						return $.t("error_not_enough_assets");
-						break;
 					case "Not enough funds":
-						return $.t("error_not_enough_funds");
-						break;
+					    if (response.amount !== undefined) {
+                            return $.t("error_not_enough_funds_explained", {
+                                amount: NRS.formatAmount(response.amount),
+                                fee: NRS.formatAmount(response.fee),
+                                balance: NRS.formatAmount(response.balance),
+                                diff: NRS.formatAmount(response.diff),
+                                chain: NRS.getChainName(response.chain)
+                            });
+                        } else {
+                            return $.t("error_not_enough_funds");
+                        }
 					default:
 						return response.errorDescription;
-						break;
 				}
-				break;
 			case 7:
 				if (response.errorDescription == "Not allowed") {
 					return $.t("error_not_allowed");
 				} else {
 					return response.errorDescription;
 				}
-				break;
 			case 8:
 				switch (response.errorDescription) {
 					case "Goods have not been delivered yet":
 						return $.t("error_goods_not_delivered_yet");
-						break;
 					case "Feedback already sent":
 						return $.t("error_feedback_already_sent");
-						break;
 					case "Refund already sent":
 						return $.t("error_refund_already_sent");
-						break;
 					case "Purchase already delivered":
 						return $.t("error_purchase_already_delivered");
-						break;
 					case "Decryption failed":
 						return $.t("error_decryption_failed");
-						break;
 					case "No attached message found":
 						return $.t("error_no_attached_message");
 					case "recipient account does not have public key":
 						return $.t("error_recipient_no_public_key", { "coin": NRS.getActiveChainName() });
 					default:
 						return response.errorDescription;
-						break;
 				}
-				break;
 			case 9:
 				if (response.errorDescription == "Feature not available") {
 					return $.t("error_feature_not_available");
 				} else {
 					return response.errorDescription;
 				}
-				break;
 			default:
 				return response.errorDescription;
-				break;
 		}
 	};
 
@@ -1156,15 +1137,19 @@ var NRS = (function (NRS, $, undefined) {
      * Escapes all strings in a response object
      * @param obj
      */
-    NRS.escapeResponseObjStrings = function (obj) {
+    NRS.escapeResponseObjStrings = function(obj, exclusions) {
         for (var key in obj) {
-            if (obj.hasOwnProperty(key)) {
-                var val = obj[key];
-                if (typeof val === 'string') {
-                    obj[key] = String(val).escapeHTML();
-                } else if (typeof val === 'object') {
-                    NRS.escapeResponseObjStrings(obj[key]);
-                }
+            if (!obj.hasOwnProperty(key)) {
+                continue;
+            }
+            if (exclusions && exclusions.indexOf(key) >= 0) {
+                continue;
+            }
+            var val = obj[key];
+            if (typeof val === 'string') {
+                obj[key] = String(val).escapeHTML();
+            } else if (typeof val === 'object') {
+                NRS.escapeResponseObjStrings(obj[key], exclusions);
             }
         }
     };
@@ -1237,6 +1222,10 @@ var NRS = (function (NRS, $, undefined) {
             default:
                 return NRS.constants.ACCOUNT_MASK_PREFIX;
         }
+    };
+
+    NRS.getLegacyAccountPrefix = function() {
+        return "NXT-";
     };
 
     NRS.nxtToAccountPrefix = function(account) {

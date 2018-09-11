@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2017 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2018 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -630,7 +630,7 @@ var NRS = (function(NRS, $) {
 	});
 
 	NRS.isTextMessage = function(transaction) {
-		return transaction.goodsIsText || transaction.attachment.messageIsText ||
+		return transaction.goodsIsText || transaction.attachment.goodsIsText || transaction.attachment.messageIsText ||
 			(transaction.attachment.encryptedMessage && transaction.attachment.encryptedMessage.isText) ||
 			(transaction.attachment.encryptToSelfMessage && transaction.attachment.encryptToSelfMessage.isText);
 	};

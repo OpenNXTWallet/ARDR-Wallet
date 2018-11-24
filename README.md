@@ -8,7 +8,7 @@ If you do not trust this Repository, you can find the actual Version here: https
 # Attention
 We are NOT affiliated with, funded, or in any way associated with the organization known as NXT FOUNDATION.
 
-You can find hosted Wallet under: https://ardr.open-nxt-allet.eu:27876/
+You can find hosted Wallet under: https://ardr.open-nxt-wallet.eu:27876/
 
 ----
 

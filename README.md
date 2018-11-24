@@ -1,4 +1,4 @@
-# ARDR Wallet: Version 2.0.14
+# ARDR Wallet: Version 2.1.2
 
 For some Automations Processes we need the ARDR Client on GitHub.
 Fell free to use it, to make things easier.

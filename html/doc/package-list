@@ -1,3 +1,5 @@
+com.jelurida.ardor.client.api
+com.jelurida.ardor.contracts
 nxt
 nxt.account
 nxt.addons
@@ -6,6 +8,7 @@ nxt.aliases
 nxt.authentication
 nxt.blockchain
 nxt.ce
+nxt.configuration
 nxt.crypto
 nxt.db
 nxt.dbschema
@@ -13,6 +16,9 @@ nxt.dgs
 nxt.env
 nxt.env.service
 nxt.http
+nxt.http.callers
+nxt.http.responses
+nxt.lightcontracts
 nxt.messaging
 nxt.ms
 nxt.ms.mint
@@ -21,4 +27,5 @@ nxt.shuffling
 nxt.taggeddata
 nxt.tools
 nxt.util
+nxt.util.bbh
 nxt.voting

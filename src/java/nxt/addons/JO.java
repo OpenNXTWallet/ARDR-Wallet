@@ -1,3 +1,18 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package nxt.addons;
 
 import nxt.util.Convert;
@@ -28,14 +43,20 @@ public class JO extends AbstractMap {
     }
 
     public JO(JSONObject jo) {
+        if (jo == null) {
+            throw new IllegalArgumentException("Attempt to initialize JO with null JSONObject");
+        }
         this.jo = jo;
     }
 
-    public JO(Object jo) {
-        if (jo instanceof JSONObject) {
-            this.jo = (JSONObject)jo;
+    public JO(Object obj) {
+        if (obj == null) {
+            throw new IllegalArgumentException("Attempt to initialize JO with null Object");
+        }
+        if (obj instanceof JSONObject) {
+            this.jo = (JSONObject)obj;
         } else {
-            this.jo = ((JO)jo).toJSONObject();
+            this.jo = ((JO)obj).toJSONObject();
         }
     }
 
@@ -62,8 +83,13 @@ public class JO extends AbstractMap {
         Object o = jo.get(key);
         if (o == null) {
             return Collections.EMPTY_LIST; // no need to deal with null checks
+        } else if (o instanceof JSONArray) {
+            return (List<JO>)(new JA((JSONArray) o));
+        } else if(o instanceof JA) {
+            return (List<JO>)(o);
+        } else {
+            throw new IllegalArgumentException(key);
         }
-        return (List<JO>)(new JA((JSONArray) o));
     }
 
     public static JO valueOf(Object o) {
@@ -106,10 +132,6 @@ public class JO extends AbstractMap {
         return Long.parseUnsignedLong((String) value);
     }
 
-    public double numericToDouble(String key) {
-        return (Double)jo.get(key);
-    }
-
     // Used by JSON encodeObject
     @Override
     public Set<Entry> entrySet() {
@@ -148,6 +170,36 @@ public class JO extends AbstractMap {
             return (int)value;
         }
         return (int)getLong(key);
+    }
+
+    public double getDouble(String key, double defaultValue) {
+        if (isExist(key)) {
+            return getDouble(key);
+        }
+        return defaultValue;
+    }
+
+    public double getDouble(String key) {
+        Object value = jo.get(key);
+        if (value instanceof String) {
+            return Double.parseDouble((String)value);
+        }
+        return (double)value;
+    }
+
+    public float getFloat(String key, float defaultValue) {
+        if (isExist(key)) {
+            return getFloat(key);
+        }
+        return defaultValue;
+    }
+
+    public float getFloat(String key) {
+        Object value = jo.get(key);
+        if (value instanceof Float) {
+            return (float)value;
+        }
+        return (float)getDouble(key);
     }
 
     public short getShort(String key, short defaultValue) {
@@ -209,6 +261,9 @@ public class JO extends AbstractMap {
         Object o = jo.get(key);
         if (o == null) {
             return null;
+        }
+        if (!(o instanceof String)) {
+            return o.toString();
         }
         return (String)o;
     }

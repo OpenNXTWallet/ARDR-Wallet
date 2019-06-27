@@ -1,4 +1,4 @@
-# ARDR Wallet: Version 2.1.2
+# ARDR Wallet: Version 2.2.5
 
 For some Automations Processes we need the ARDR Client on GitHub.
 Fell free to use it, to make things easier.
@@ -89,10 +89,10 @@ in such a way that no trusted third parties are required anymore.
     - OPERATORS-GUIDE.md
 
   - in the wiki:
-    - nxtwiki.org
+    - https://ardordocs.jelurida.com/Getting_started
 
   - on the forums:
-    - nxtforum.org
+    - https://ardorforum.org/
     
 ----
 

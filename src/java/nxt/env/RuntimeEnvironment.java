@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -17,6 +17,9 @@
 package nxt.env;
 
 import nxt.Nxt;
+import nxt.util.Logger;
+import nxt.util.security.BlockchainPermission;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
@@ -70,6 +73,10 @@ public class RuntimeEnvironment {
     }
 
     private static boolean isDesktopEnabled(String configuredMode) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("desktop"));
+        }
         boolean isDesktopModeConfigured;
         if (configuredMode == null) {
             isDesktopModeConfigured = "desktop".equalsIgnoreCase(Nxt.getStringProperty(RUNTIME_MODE_ARG));
@@ -81,10 +88,17 @@ public class RuntimeEnvironment {
     }
 
     public static boolean isDesktopApplicationEnabled() {
-        return isDesktopEnabled(null) && Nxt.getBooleanProperty("nxt.launchDesktopApplication") && hasJavaFX;
+        boolean isDesktopEnabled = isDesktopEnabled(null);
+        boolean isLaunchDesktopApplication = Nxt.getBooleanProperty("nxt.launchDesktopApplication");
+        Logger.logInfoMessage("Desktop application isDesktopEnabled:" + isDesktopEnabled + ", isLaunchDesktopApplication:" + isLaunchDesktopApplication + ", hasJavaFX:" + hasJavaFX);
+        return isDesktopEnabled && isLaunchDesktopApplication && hasJavaFX;
     }
 
     public static RuntimeMode getRuntimeMode(String configuredMode) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("desktop"));
+        }
         System.out.println("isHeadless=" + isHeadless());
         if (isDesktopEnabled(configuredMode)) {
             return new DesktopMode();
@@ -96,10 +110,14 @@ public class RuntimeEnvironment {
     }
 
     public static DirProvider getDirProvider(String configuredMode) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("sensitiveInfo"));
+        }
         String dirProvider = System.getProperty(DIRPROVIDER_ARG);
         if (dirProvider != null) {
             try {
-                return (DirProvider)Class.forName(dirProvider).newInstance();
+                return (DirProvider)Class.forName(dirProvider).getConstructor().newInstance();
             } catch (ReflectiveOperationException e) {
                 System.out.println("Failed to instantiate dirProvider " + dirProvider);
                 throw new RuntimeException(e.getMessage(), e);

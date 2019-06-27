@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -68,7 +68,7 @@ public class APITestServlet extends HttpServlet {
             "                    readonly style='margin-top:8px;'></li>\n" +
             "               <li><input type='text' class='form-control' id='search' " +
             "                    placeholder='Search' style='margin-top:8px;'></li>\n" +
-            "               <li><a href='https://nxtwiki.org/wiki/The_Nxt_API' target='_blank' style='margin-left:20px;'>Wiki Docs</a></li>\n" +
+            "               <li><a href='https://ardordocs.jelurida.com/API' target='_blank' style='margin-left:20px;'>Wiki Docs</a></li>\n" +
             "           </ul>\n" +
             "       </div>\n" +
             "   </div>\n" +
@@ -173,7 +173,7 @@ public class APITestServlet extends HttpServlet {
         resp.setDateHeader("Expires", 0);
         resp.setContentType("text/html; charset=UTF-8");
 
-        if (! API.isAllowed(req.getRemoteHost())) {
+        if (API.isForbiddenHost(req.getRemoteHost())) {
             resp.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
@@ -250,7 +250,7 @@ public class APITestServlet extends HttpServlet {
         buf.append("<a style='font-weight:normal;font-size:14px;color:#777;' href='/doc/");
         buf.append(className.replace('.', '/').replace('$', '.')).append(".html' target='_blank'>javadoc</a>&nbsp;&nbsp;\n");
         buf.append("<a style='font-weight:normal;font-size:14px;color:#777;' href='");
-        buf.append("https://docs.jelurida.com/");
+        buf.append("https://ardordocs.jelurida.com/");
         buf.append(requestHandler.getDocsUrlPath());
         buf.append("' target='_blank'>wiki</a>&nbsp;&nbsp;\n");
         buf.append("&nbsp;&nbsp;&nbsp;\n<input type='checkbox' class='api-call-sel-ALL' ");
@@ -286,6 +286,8 @@ public class APITestServlet extends HttpServlet {
             buf.append("style='width:100%;min-width:200px;'/></td>\n");
             buf.append("</tr>\n");
         }
+        int paramIndex = 0;
+        String prevParam = null;
         for (String parameter : parameters) {
             buf.append("<tr class='api-call-input-tr'>\n");
             buf.append("<td>").append(parameter).append(":</td>\n");
@@ -295,7 +297,14 @@ public class APITestServlet extends HttpServlet {
                 buf.append("<td><input type='").append(isPassword(parameter, requestHandler) ? "password" : "text").append("' ");
             }
             buf.append("name='").append(parameter).append("' ");
-            String value = Convert.emptyToNull(req.getParameter(parameter));
+            if (parameter.equals(prevParam)) {
+                paramIndex++;
+            } else {
+                paramIndex = 0;
+            }
+            prevParam = parameter;
+            String[] parameterValues = req.getParameterValues(parameter);
+            String value = Convert.emptyToNull(parameterValues != null && paramIndex < parameterValues.length ? parameterValues[paramIndex] : null);
             if (value != null) {
                 buf.append("value='").append(value.replace("'", "&quot;")).append("' ");
             }
@@ -337,7 +346,7 @@ public class APITestServlet extends HttpServlet {
     }
 
     private static boolean isTextArea(String parameter, APIServlet.APIRequestHandler requestHandler) {
-        return "website".equals(parameter) || requestHandler.isTextArea(parameter);
+        return requestHandler.isTextArea(parameter);
     }
 
     static void initClass() {}

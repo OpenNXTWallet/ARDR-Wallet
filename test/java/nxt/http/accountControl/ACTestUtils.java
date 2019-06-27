@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -255,11 +255,14 @@ public class ACTestUtils {
     }
 
     public static APICall.Builder approveBuilder(Object fullHash, Tester approver, String secret) {
-        return new APICall.Builder("approveTransaction")
+        APICall.Builder builder = new APICall.Builder("approveTransaction")
                 .param("secretPhrase", approver.getSecretPhrase())
-                .param("phasedTransaction", ChildChain.IGNIS.getId() + ":" + fullHash)
                 .param("revealedSecretText", secret)
                 .param("feeNQT", ChildChain.IGNIS.ONE_COIN);
+        if (fullHash != null) {
+            builder = builder.param("phasedTransaction", ChildChain.IGNIS.getId() + ":" + fullHash);
+        }
+        return builder;
     }
 
     public enum PhasingStatus {

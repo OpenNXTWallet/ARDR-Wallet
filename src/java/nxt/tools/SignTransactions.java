@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -19,6 +19,7 @@ package nxt.tools;
 import nxt.Nxt;
 import nxt.blockchain.Transaction;
 import nxt.util.Convert;
+import nxt.util.security.BlockchainPermission;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -31,6 +32,11 @@ import java.io.InputStreamReader;
 public final class SignTransactions {
 
     public static void main(String[] args) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("tools"));
+        }
+
         try {
             if (args.length != 2) {
                 System.out.println("Usage: SignTransactions <unsigned transaction bytes file> <signed transaction bytes file>");

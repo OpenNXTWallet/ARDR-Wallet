@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -16,8 +16,10 @@
 
 package nxt;
 
+import nxt.addons.AddonsSuite;
 import nxt.blockchain.GeneratorTest;
 import nxt.http.PaymentAndMessagesSuite;
+import nxt.http.SecretSharingApiTest;
 import nxt.http.accountControl.AccountControlSuite;
 import nxt.http.accountproperties.AccountPropertiesSuite;
 import nxt.http.alias.CreateAliasTest;
@@ -48,7 +50,9 @@ import org.junit.runners.Suite;
         AccountControlSuite.class,
         AccountPropertiesSuite.class,
         CreateAliasTest.class,
-        ContractReferenceTest.class
+        ContractReferenceTest.class,
+        AddonsSuite.class,
+        SecretSharingApiTest.class
 })
 public class TestDbSuite extends SafeShutdownSuite {
 }

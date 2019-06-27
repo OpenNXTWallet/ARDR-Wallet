@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -35,7 +35,7 @@ public final class SendMessage extends CreateTransaction {
     protected JSONStreamAware processRequest(HttpServletRequest req) throws NxtException {
         long recipientId = ParameterParser.getAccountId(req, "recipient", false);
         Account account = ParameterParser.getSenderAccount(req);
-        return createTransaction(req, account, recipientId, 0, MessageAttachment.INSTANCE);
+        return transactionParameters(req, account, MessageAttachment.INSTANCE).setRecipientId(recipientId).createTransaction();
     }
 
 }

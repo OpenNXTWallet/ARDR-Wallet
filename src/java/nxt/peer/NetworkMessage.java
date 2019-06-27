@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -2294,6 +2294,7 @@ public abstract class NetworkMessage {
                 BlockBytes bytes = new BlockBytes(block);
                 if (getLength() + bytes.getLength() > NetworkHandler.MAX_MESSAGE_SIZE) {
                     ((ArrayList)blockBytes).trimToSize();
+                    Logger.logDebugMessage("Blocks message size exceeds " + NetworkHandler.MAX_MESSAGE_SIZE);
                     break;
                 }
                 blockBytes.add(bytes);
@@ -2746,6 +2747,7 @@ public abstract class NetworkMessage {
                 TransactionBytes bytes = new TransactionBytes(tx);
                 if (getLength() + bytes.getLength() > NetworkHandler.MAX_MESSAGE_SIZE) {
                     ((ArrayList)transactionBytes).trimToSize();
+                    Logger.logDebugMessage("Transactions message size exceeds " + NetworkHandler.MAX_MESSAGE_SIZE);
                     break;
                 }
                 transactionBytes.add(bytes);

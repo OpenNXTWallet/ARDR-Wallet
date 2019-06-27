@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -23,6 +23,7 @@ import nxt.peer.Peer;
 import nxt.peer.Peers;
 import nxt.util.Logger;
 import nxt.util.ThreadPool;
+import nxt.util.security.BlockchainPermission;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class APIProxy {
-    public static final Set<String> NOT_FORWARDED_REQUESTS;
+    static final Set<String> NOT_FORWARDED_REQUESTS;
 
     private static final APIProxy instance = new APIProxy();
 
@@ -100,6 +101,10 @@ public class APIProxy {
     public static void init() {}
 
     public static APIProxy getInstance() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("api"));
+        }
         return instance;
     }
 

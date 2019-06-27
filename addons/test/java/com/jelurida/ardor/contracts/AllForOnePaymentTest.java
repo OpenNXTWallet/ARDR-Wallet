@@ -1,11 +1,23 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package com.jelurida.ardor.contracts;
 
-import nxt.Nxt;
 import nxt.addons.JA;
 import nxt.addons.JO;
-import nxt.blockchain.Block;
 import nxt.blockchain.ChildTransaction;
-import nxt.blockchain.FxtTransaction;
 import nxt.http.APICall;
 import nxt.messaging.PrunablePlainMessageAppendix;
 import nxt.util.Convert;
@@ -49,10 +61,10 @@ public class AllForOnePaymentTest extends AbstractContractTest {
     @Test
     public void allForOnePayment() {
         JO setupParams = new JO();
-        setupParams.put("frequency", 6);
+        setupParams.put("frequency", "Value from properties will override this setting");
         String contractName = AllForOnePayment.class.getSimpleName();
-        ContractTestHelper.deployContract(contractName, setupParams, false);
-        ContractTestHelper.deployContract(DistributedRandomNumberGenerator.class.getSimpleName(), null, true);
+        ContractTestHelper.deployContract(AllForOnePayment.class, setupParams, false);
+        ContractTestHelper.deployContract(DistributedRandomNumberGenerator.class, null, true);
         JO messageJson = new JO();
         messageJson.put("seed", ContractTestHelper.getRandomSeed(System.identityHashCode(messageJson))); // Specify a random seed
         String message = messageJson.toJSONString();
@@ -118,38 +130,23 @@ public class AllForOnePaymentTest extends AbstractContractTest {
         generateBlock(); // Now the distribution takes place (height 6)
         generateBlock(); // And now the reward transaction is processed
 
-        Block lastBlock = Nxt.getBlockchain().getLastBlock();
-        boolean isFound = false;
-        String fullHashHex = null;
         List<Long> participants = new ArrayList<>(Arrays.asList(ALICE.getId(), BOB.getId(), CHUCK.getId(), DAVE.getId()));
-        for (FxtTransaction transaction : lastBlock.getFxtTransactions()) {
-            for (ChildTransaction childTransaction : transaction.getSortedChildTransactions()) {
-                isFound = true;
-                Assert.assertEquals(2, childTransaction.getChain().getId());
-                Assert.assertEquals(0, childTransaction.getType().getType());
-                Assert.assertEquals(0, childTransaction.getType().getSubtype());
-                Assert.assertEquals(99998000000L, childTransaction.getAmount());
-                Assert.assertEquals(2000000L, childTransaction.getFee());
-                Assert.assertEquals(ALICE.getAccount().getId(), childTransaction.getSenderId());
-                Assert.assertTrue(participants.contains(childTransaction.getRecipientId()));
-                PrunablePlainMessageAppendix appendix = (PrunablePlainMessageAppendix) childTransaction.getAppendages().stream().filter(a -> a instanceof PrunablePlainMessageAppendix).findFirst().orElse(null);
-                if (appendix == null) {
-                    Assert.fail("PrunablePlainMessageAppendix not found");
-                }
-                fullHashHex = Convert.toHexString(childTransaction.getFullHash());
-            }
-        }
-        Assert.assertTrue(isFound);
+        ChildTransaction childTransaction = testAndGetLastChildTransaction(2, 0, 0, a -> a == 99998000000L, 2000000L, ALICE, null, null);
+        Assert.assertTrue(participants.contains(childTransaction.getRecipientId()));
+        childTransaction.getAppendages().stream()
+                .filter(PrunablePlainMessageAppendix.class::isInstance)
+                .findFirst()
+                .get();
 
         // Trigger the contract based on the transaction it just submitted
         apiCall = new APICall.Builder("triggerContractByTransaction").
                 param("chain", IGNIS.getId()).
-                param("triggerFullHash", fullHashHex).
+                param("triggerFullHash", Convert.toHexString(childTransaction.getFullHash())).
                 param("apply", "true").
                 param("validate", "true").
                 build();
         response = new JO(apiCall.invoke());
-        Assert.assertTrue(response.getString("errorDescription").startsWith("Invalid phased transaction")); // This is fine since the contract is not under account control
+        Assert.assertTrue(response.getString("errorDescription").startsWith("Cannot approve transaction, validatorSecretPhrase not specified"));
 
         // Trigger the contract based on a specific height without actually submitting the transactions
         apiCall = new APICall.Builder("triggerContractByHeight").

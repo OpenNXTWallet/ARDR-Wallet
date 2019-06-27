@@ -1,5 +1,21 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package nxt.addons;
 
+import nxt.http.callers.GetBlockCall;
 import nxt.http.responses.BlockResponse;
 
 import javax.servlet.http.HttpServletRequest;
@@ -14,16 +30,28 @@ import java.util.Map;
 public class RequestContext extends AbstractContractContext {
 
     private final HttpServletRequest req;
+    private final JO requestParams;
+    private BlockResponse blockResponse;
 
     public RequestContext(HttpServletRequest req, ContractRunnerConfig config, String contractName) {
         super(config, contractName);
         this.source = EventSource.REQUEST;
         this.req = req;
+        this.requestParams = new JO();
+        req.getParameterMap().forEach((k, v) -> requestParams.put(k, v[0])); // For parameters with multiple values we only take the first one
     }
 
     @Override
     public BlockResponse getBlock() {
-        throw new UnsupportedOperationException();
+        if (blockResponse != null) {
+            return blockResponse;
+        }
+        blockResponse = GetBlockCall.create().getBlock();
+        return blockResponse;
+    }
+
+    public JO getRuntimeParams() {
+        return requestParams;
     }
 
     public HttpServletRequest getRequest() {

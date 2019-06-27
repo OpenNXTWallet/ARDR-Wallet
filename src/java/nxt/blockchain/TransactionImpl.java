@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -28,6 +28,7 @@ import nxt.util.Convert;
 import nxt.util.Filter;
 import nxt.util.JSON;
 import nxt.util.Logger;
+import nxt.util.security.BlockchainPermission;
 import org.json.simple.JSONObject;
 
 import java.math.BigInteger;
@@ -37,14 +38,7 @@ import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
 
 public abstract class TransactionImpl implements Transaction {
 
@@ -674,6 +668,10 @@ public abstract class TransactionImpl implements Transaction {
             }
         }
 
+        if (getSenderId() == Constants.BURN_ACCOUNT_ID) {
+            throw new NxtException.NotValidException(String.format("Burn account %s not allowed to send transactions", Convert.rsAccount(senderId)));
+        }
+
     }
 
     void validateId() throws NxtException.ValidationException {
@@ -840,6 +838,10 @@ public abstract class TransactionImpl implements Transaction {
     }
 
     public static TransactionImpl.BuilderImpl newTransactionBuilder(byte[] bytes) throws NxtException.NotValidException {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("newTransactionBuilder"));
+        }
         try {
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
             buffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -884,12 +886,20 @@ public abstract class TransactionImpl implements Transaction {
     }
 
     public static TransactionImpl.BuilderImpl newTransactionBuilder(byte[] bytes, JSONObject prunableAttachments) throws NxtException.NotValidException {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("newTransactionBuilder"));
+        }
         TransactionImpl.BuilderImpl builder = newTransactionBuilder(bytes);
         builder.prunableAttachments(prunableAttachments);
         return builder;
     }
 
     public static TransactionImpl.BuilderImpl newTransactionBuilder(JSONObject transactionData) throws NxtException.NotValidException {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("newTransactionBuilder"));
+        }
         try {
             int chainId = ((Long) transactionData.get("chain")).intValue();
             byte type = ((Long) transactionData.get("type")).byteValue();

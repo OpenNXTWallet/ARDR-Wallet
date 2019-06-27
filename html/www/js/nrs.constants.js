@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2018 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2019 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -73,12 +73,18 @@ var NRS = (function (NRS, $) {
         'NOT_FORGING': 'not_forging',
         'UNKNOWN': 'unknown',
         'INITIAL_BASE_TARGET': 153722867,
+        'TESTNET_ACCELERATION': 6,
+        'TESTNET_ACCELERATION_BLOCK': 455000,
         'SIGNATURE_POSITION': 69, // bytes before signature from TransactionImpl newTransactionBuilder()
-        'SIGNATURE_LENGTH': 64
+        'SIGNATURE_LENGTH': 64,
+        'SECRET_WORDS_HASH': "9e7c7a62a5c2bbc2b8d9a53c3b3ff2ef1c512939924704a2de584e27023c39b3",
+        'SECRET_WORDS': [],
+        'SECRET_WORDS_MAP': {}
     };
     
     var CHAIN_DISPLAY_TO_LOGIC_MAPPING = { "BITS": "BITSWIFT" };
     var CHAIN_LOGIC_TO_DISPLAY_MAPPING = { "BITSWIFT": "BITS" };
+    var CHAIN_DESCRIPTION = [];
 
     NRS.loadAlgorithmList = function (algorithmSelect, isPhasingHash) {
         var hashAlgorithms;
@@ -141,12 +147,29 @@ var NRS = (function (NRS, $) {
             NRS.constants.ACCOUNT_MASK_PREFIX = response.accountPrefix + "-";
             NRS.constants.ACCOUNT_MASK_LEN = NRS.constants.ACCOUNT_MASK_PREFIX.length;
             NRS.constants.INITIAL_BASE_TARGET = parseInt(response.initialBaseTarget);
+            NRS.constants.LEASING_DELAY = parseInt(response.leasingDelay);
+            getSecretWords(response.secretPhraseWords);
             console.log("done loading server constants");
             if (resolve) {
                 resolve();
             }
         }
     };
+
+    function getSecretWords(compressedWords) {
+        var bytes = converters.hexStringToByteArray(compressedWords);
+        sha256 = CryptoJS.algo.SHA256.create();
+        sha256.update(converters.byteArrayToWordArrayEx(bytes));
+        var hash = converters.byteArrayToHexString(converters.wordArrayToByteArrayEx(sha256.finalize()));
+        if (hash != NRS.constants.SECRET_WORDS_HASH) {
+            throw "invalid secret words list";
+        }
+        var wordsStr = pako.inflate(bytes, { to: 'string' });
+        NRS.constants.SECRET_WORDS = wordsStr.split(",");
+        for (var i=0; i<NRS.constants.SECRET_WORDS.length; i++) {
+            NRS.constants.SECRET_WORDS_MAP[NRS.constants.SECRET_WORDS[i]] = i;
+        }
+    }
 
     NRS.loadServerConstants = function(resolve, isUnitTest) {
         function processConstants(response) {
@@ -264,7 +287,19 @@ var NRS = (function (NRS, $) {
             requestType == "getForging" ||
             requestType == "startFundingMonitor" ||
             requestType == "startBundler" ||
+            requestType == "addBundlingRule" ||
+            requestType == "startStandbyShuffler" ||
             requestType == "signTransaction";
+    };
+
+    /**
+     * Special case for transaction types which set the recipient to account which is not part of the transaction data.
+     * For example to the asset issuer account in asset property transactions.
+     * @param requestType the request type
+     * @returns {boolean} is it a requestType which creates a transaction with special recipient
+     */
+    NRS.isSpecialRecipient = function (requestType) {
+        return requestType == "setAssetProperty" || requestType == "deleteAssetProperty";
     };
 
     NRS.getFileUploadConfig = function (requestType, data) {
@@ -290,6 +325,10 @@ var NRS = (function (NRS, $) {
             }
             config.errorDescription = "error_message_too_big";
             config.maxSize = NRS.constants.MAX_PRUNABLE_MESSAGE_LENGTH;
+            return config;
+        } else if (requestType == "uploadContractRunnerConfiguration") {
+            config.selector = "#upload_contract_runner_config_file";
+            config.requestParam = "config";
             return config;
         }
         return null;
@@ -330,6 +369,13 @@ var NRS = (function (NRS, $) {
         return name != null ? name : chainName;
     };
 
+    NRS.getChainDescription = function(chainId) {
+        if (CHAIN_DESCRIPTION.length == 0) {
+            CHAIN_DESCRIPTION = ["", $.t("parent_chain"), $.t("main_child_chain"), $.t("euro_pegged_chain"), $.t("bits_chain"), $.t("mpg_chain") ];
+        }
+        return CHAIN_DESCRIPTION[chainId];
+    };
+
     NRS.findChainByName = function(chainName) {
         for (var id in  NRS.constants.CHAIN_PROPERTIES) {
             if (NRS.constants.CHAIN_PROPERTIES.hasOwnProperty(id) &&
@@ -363,12 +409,20 @@ var NRS = (function (NRS, $) {
         return NRS.getActiveChainId() == 1;
     };
 
+    NRS.isIgnisChain = function() {
+        return NRS.getActiveChainId() == 2;
+    };
+
     NRS.getActiveChainName = function() {
         return NRS.getChainDisplayName(String(NRS.constants.CHAIN_PROPERTIES[NRS.getActiveChainId()].name).escapeHTML());
     };
 
     NRS.getParentChainName = function() {
         return NRS.getChainDisplayName(String(NRS.constants.CHAIN_PROPERTIES[1].name).escapeHTML());
+    };
+
+    NRS.getParentChainDecimals = function() {
+        return NRS.constants.CHAIN_PROPERTIES[1].decimals;
     };
 
     NRS.getActiveChainDecimals = function() {
@@ -403,6 +457,7 @@ var NRS = (function (NRS, $) {
         return -1;
     };
 
+    // TODO should we add the chain description to login page as well? This would requires some re-design
     NRS.createChainSelect = function() {
         // Build chain select box for login page
         var chains = $('select[name="chain"]');

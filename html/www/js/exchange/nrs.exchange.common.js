@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2018 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2019 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -18,13 +18,6 @@
  * @depends {nrs.js}
  */
 var NRS = (function(NRS, $) {
-
-    NRS.invert = function(rate) {
-        var bigRate = new Big(rate);
-        var bigOne = new Big(1);
-        var result = bigOne.div(bigRate);
-        return result.toFixed(8);
-    };
 
     NRS.getCoins = function(exchange) {
         var coins = [];

@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -109,7 +109,7 @@ public final class DbShellServlet extends HttpServlet {
         resp.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, private");
         resp.setHeader("Pragma", "no-cache");
         resp.setDateHeader("Expires", 0);
-        if (! API.isAllowed(req.getRemoteHost())) {
+        if (API.isForbiddenHost(req.getRemoteHost())) {
             resp.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }
@@ -137,7 +137,7 @@ public final class DbShellServlet extends HttpServlet {
         resp.setHeader("Cache-Control", "no-cache, no-store, must-revalidate, private");
         resp.setHeader("Pragma", "no-cache");
         resp.setDateHeader("Expires", 0);
-        if (! API.isAllowed(req.getRemoteHost())) {
+        if (API.isForbiddenHost(req.getRemoteHost())) {
             resp.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }

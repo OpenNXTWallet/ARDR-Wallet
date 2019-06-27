@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -18,6 +18,7 @@ package nxt.db;
 
 import nxt.Nxt;
 import nxt.util.Logger;
+import nxt.util.security.BlockchainPermission;
 import org.h2.jdbcx.JdbcConnectionPool;
 
 import java.sql.Connection;
@@ -110,6 +111,10 @@ public class BasicDb {
     private volatile boolean initialized = false;
 
     public BasicDb(DbProperties dbProperties) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("db"));
+        }
         long maxCacheSize = dbProperties.maxCacheSize;
         if (maxCacheSize == 0) {
             maxCacheSize = Math.min(256, Math.max(16, (Runtime.getRuntime().maxMemory() / (1024 * 1024) - 128)/2)) * 1024;

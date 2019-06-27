@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -16,7 +16,6 @@
 
 package nxt.aliases;
 
-import nxt.Constants;
 import nxt.NxtException;
 import nxt.blockchain.Attachment;
 import nxt.blockchain.TransactionType;
@@ -50,14 +49,12 @@ public final class AliasBuyAttachment extends Attachment.AbstractAttachment {
 
     @Override
     protected int getMySize() {
-        return 1 + Convert.toBytes(aliasName).length;
+        return AliasAssignmentAttachment.ALIAS_NAME_RW.getSize(aliasName);
     }
 
     @Override
     protected void putMyBytes(ByteBuffer buffer) {
-        byte[] aliasBytes = Convert.toBytes(aliasName);
-        buffer.put((byte) aliasBytes.length);
-        buffer.put(aliasBytes);
+        AliasAssignmentAttachment.ALIAS_NAME_RW.writeToBuffer(aliasName, buffer);
     }
 
     @Override

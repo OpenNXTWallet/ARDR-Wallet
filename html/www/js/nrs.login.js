@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2018 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2019 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -90,9 +90,7 @@ var NRS = (function(NRS, $) {
 
 		var $loading = $("#account_phrase_generator_loading");
 		var $loaded = $("#account_phrase_generator_loaded");
-		if (NRS.isWindowPrintSupported()) {
-            $(".paper-wallet-link-container").show();
-		}
+		$(".paper-wallet-link-container").show();
 
 		//noinspection JSUnresolvedVariable
 		if (window.crypto || window.msCrypto) {
@@ -123,7 +121,7 @@ var NRS = (function(NRS, $) {
 
     $("#generator_paper_wallet_link").click(function(e) {
         e.preventDefault();
-        NRS.printPaperWallet($("#account_phrase_generator_panel").find(".step_2 textarea").val());
+        NRS.printPaperWallet($("#account_phrase_generator_panel").find(".step_2 textarea").val(), 3, 2);
     });
 
 	NRS.verifyGeneratedPassphrase = function() {
@@ -199,7 +197,7 @@ var NRS = (function(NRS, $) {
 		}
 	};
 
-	NRS.switchAccount = function(account, chain) {
+	NRS.switchAccount = function(account, chainId) {
         // Reset other functional state
         $("#account_balance, #account_balance_sidebar, #account_nr_assets, #account_assets_balance, #account_currencies_balance, #account_nr_currencies, #account_purchase_count, #account_pending_sale_count, #account_completed_sale_count, #account_message_count, #account_alias_count").html("0");
         $("#id_search").find("input[name=q]").val("");
@@ -220,12 +218,13 @@ var NRS = (function(NRS, $) {
         $.each(NRS.plugins, function(pluginId) {
             NRS.determinePluginLaunchStatus(pluginId);
         });
-        NRS.mobileSettings.chain = chain;
+        NRS.mobileSettings.chain = chainId;
 
         // Return to the dashboard and notify the user
         NRS.goToPage("dashboard");
 
         // Reset security related state only when switching account not when switching chain
+		var chainDescription = NRS.constants.CHAIN_PROPERTIES[chainId].name + " " + NRS.getChainDescription(chainId);
 		if (account != NRS.accountRS) {
             NRS.setServerPassword(null);
             NRS.setAccountDetailsPassword(null);
@@ -235,12 +234,12 @@ var NRS = (function(NRS, $) {
             NRS.publicKey = "";
             NRS.accountInfo = {};
             NRS.login(false, account, function() {
-                $.growl($.t("switched_to_account", { account: account, chain: NRS.constants.CHAIN_PROPERTIES[chain].name }));
-            }, { isAccountSwitch: true, chain: chain });
+                $.growl($.t("switched_to_account", { account: account, chain: chainDescription }));
+            }, { isAccountSwitch: true, chain: chainId });
         } else {
             NRS.login(loginOptions.isPassphraseLogin, loginOptions.id, function() {
-                $.growl($.t("switched_to_chain", { chain: NRS.constants.CHAIN_PROPERTIES[chain].name }));
-            }, { isAccountSwitch: true, isSavedPassphrase: loginOptions.isSavedPassphrase, chain: chain });
+				$.growl($.t("switched_to_chain", { chain: chainDescription }));
+            }, { isAccountSwitch: true, isSavedPassphrase: loginOptions.isSavedPassphrase, chain: chainId });
         }
 	};
 
@@ -355,6 +354,18 @@ var NRS = (function(NRS, $) {
 				requestVariable = {secretPhrase: id};
 			} else {
 				accountRequest = "getAccount";
+				if (id.length > 1 && id.charAt(0) === '@') {
+					var result = NRS.getAccountAlias(id.substring(1));
+					if (result.error) {
+						$.growl(result.error, {
+							"type": "danger",
+							"offset": 10
+						});
+						NRS.spinner.stop();
+						return;
+					}
+					id = result.id;
+				}
 				requestVariable = {account: id};
 			}
 			console.log("calling " + accountRequest);
@@ -525,7 +536,6 @@ var NRS = (function(NRS, $) {
 					$(".sidebar .treeview").tree();
 					$('#dashboard_link').find('a').addClass("ignore").click();
 
-					var accounts;
 					if (rememberMe.is(":checked") || NRS.newlyCreatedAccount) {
 						rememberAccount(NRS.accountRS);
 					}
@@ -537,7 +547,7 @@ var NRS = (function(NRS, $) {
                     accountIdDropdown.find(".dropdown-menu .switchAccount").remove();
                     if (NRS.getStrItem("savedNxtAccounts") && NRS.getStrItem("savedNxtAccounts")!=""){
                         accountIdDropdown.show();
-                        accounts = NRS.getStrItem("savedNxtAccounts").split(";");
+                        var accounts = NRS.getStrItem("savedNxtAccounts").split(";");
                         $.each(accounts, function(index, account) {
                             if (account != '') {
                                 accountIdDropdown.find('.dropdown-menu')
@@ -569,7 +579,7 @@ var NRS = (function(NRS, $) {
 								.attr("href", "#")
 								.attr("style", "font-size: 85%;")
 								.attr("onClick", "NRS.switchAccount('" + NRS.accountRS + "','" + chain.id + "')")
-								.text(NRS.getChainDisplayName(chain.name))
+								.text(NRS.getChainDisplayName(chain.name) + " " + NRS.getChainDescription(chain.id))
 							)
 						);
 					}

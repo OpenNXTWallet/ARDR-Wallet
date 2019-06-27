@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -46,7 +46,6 @@ public final class JSONResponses {
     public static final JSONStreamAware MISSING_HALLMARK = missing("hallmark");
     public static final JSONStreamAware INCORRECT_HALLMARK = incorrect("hallmark");
     public static final JSONStreamAware MISSING_WEBSITE = missing("website");
-    public static final JSONStreamAware INCORRECT_WEBSITE = incorrect("website");
     public static final JSONStreamAware MISSING_TOKEN = missing("token");
     public static final JSONStreamAware INCORRECT_TOKEN = incorrect("token");
     public static final JSONStreamAware MISSING_ACCOUNT = missing("account");
@@ -153,6 +152,8 @@ public final class JSONResponses {
     public static final JSONStreamAware MISSING_RECIPIENT_PUBLIC_KEY = missing("recipientPublicKey");
     public static final JSONStreamAware INCORRECT_ACCOUNT_PROPERTY_NAME_LENGTH = incorrect("property", "(length must be > 0 but less than " + Constants.MAX_ACCOUNT_PROPERTY_NAME_LENGTH + " characters)");
     public static final JSONStreamAware INCORRECT_ACCOUNT_PROPERTY_VALUE_LENGTH = incorrect("value", "(length must be less than " + Constants.MAX_ACCOUNT_PROPERTY_VALUE_LENGTH + " characters)");
+    public static final JSONStreamAware INCORRECT_ASSET_PROPERTY_NAME_LENGTH = incorrect("property", "(length must be > 0 but less than " + Constants.MAX_ASSET_PROPERTY_NAME_LENGTH + " characters)");
+    public static final JSONStreamAware INCORRECT_ASSET_PROPERTY_VALUE_LENGTH = incorrect("value", "(length must be less than " + Constants.MAX_ASSET_PROPERTY_VALUE_LENGTH + " characters)");
     public static final JSONStreamAware INCORRECT_PROPERTY = incorrect("property", "(cannot be deleted by this account)");
     public static final JSONStreamAware UNKNOWN_PROPERTY = unknown("property");
     public static final JSONStreamAware MISSING_PROPERTY = missing("property");
@@ -570,6 +571,9 @@ public final class JSONResponses {
         response.put("errorDescription", "No trades found");
         NO_TRADES_FOUND = JSON.prepare(response);
     }
+
+    public static final JSONStreamAware INCORRECT_RECIPIENTS_PUBLIC_KEY = incorrect("recipientsPublicKey",
+            "all specified recipient accounts are used");
 
     private JSONResponses() {} // never
 

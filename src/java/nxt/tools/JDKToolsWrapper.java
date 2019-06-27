@@ -1,5 +1,21 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package nxt.tools;
 
+import nxt.util.security.BlockchainPermission;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -47,28 +63,24 @@ public class JDKToolsWrapper {
      * Javac 8 - [wrote RegularFileObject[C:\Users\riker\AppData\Local\Temp\src\com\jelurida\ardor\contracts\ForgingReward.class]]
      * Javac 10 - [wrote DirectoryFileObject[C:\Users\riker\AppData\Local\Temp\src:com/jelurida/ardor/contracts/ForgingReward.class]]
      */
-    private static final Pattern JAVAC_8_CLASS_COMPILATION_EVENT = Pattern.compile("^\\[wrote RegularFileObject\\[(.*)\\]\\]");
-    private static final Pattern JAVAC_10_CLASS_COMPILATION_EVENT = Pattern.compile("^\\[wrote DirectoryFileObject\\[(.*):([^\\\\].*)\\]\\]");
-    private static final Pattern JAVAC_11_CLASS_COMPILATION_EVENT = Pattern.compile("^\\[wrote (.*)\\]");
+    private static final Pattern JAVAC_8_CLASS_COMPILATION_EVENT = Pattern.compile("^\\[wrote RegularFileObject\\[(.*)]]");
+    private static final Pattern JAVAC_10_CLASS_COMPILATION_EVENT = Pattern.compile("^\\[wrote DirectoryFileObject\\[(.*):([^\\\\].*)]]");
+    private static final Pattern JAVAC_11_CLASS_COMPILATION_EVENT = Pattern.compile("^\\[wrote (.*)]");
 
     enum OPTION {
-        SOURCE('s', "source", true, "path to source code file to verify", false, (OPTION)null),
-        JAVAC('j', "javac", true, "javac options (space separated, surround with quotes)", false, (OPTION)null);
+        SOURCE('s', "source", true, "path to source code file to verify"),
+        JAVAC('j', "javac", true, "javac options (space separated, surround with quotes)");
 
         private final char opt;
         private final String longOpt;
         private boolean hasArgs;
         private String description;
-        private boolean isAction;
-        private OPTION[] dependencies;
 
-        OPTION(char opt, String longOpt, boolean hasArgs, String description, boolean isAction, OPTION... dependencies) {
+        OPTION(char opt, String longOpt, boolean hasArgs, String description) {
             this.opt = opt;
             this.longOpt = longOpt;
             this.hasArgs = hasArgs;
             this.description = description;
-            this.isAction = isAction;
-            this.dependencies = dependencies;
         }
 
         public String getOpt() {
@@ -87,16 +99,14 @@ public class JDKToolsWrapper {
             return description;
         }
 
-        public boolean isAction() {
-            return isAction;
-        }
-
-        public OPTION[] getDependencies() {
-            return dependencies;
-        }
     }
 
     public static void main(String[] args) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("tools"));
+        }
+
         Options options = new Options();
         Arrays.stream(OPTION.values()).forEach(o -> options.addOption(new Option(o.getOpt(), o.getLongOpt(), o.hasArgs(), o.getDescription())));
         CommandLineParser parser = new DefaultParser();
@@ -113,7 +123,9 @@ public class JDKToolsWrapper {
             formatter.printHelp(JDKToolsWrapper.class.getName(), options);
             return;
         }
-        Map<String, byte[]> compiledClasses = JDKToolsWrapper.compile(cmd.getOptionValue(OPTION.SOURCE.longOpt), cmd.getOptionValue(OPTION.JAVAC.longOpt));
+        String tmpDir = System.getProperty("java.io.tmpdir");
+        Path outputPath = Paths.get(tmpDir, "src");
+        Map<String, byte[]> compiledClasses = JDKToolsWrapper.compile(cmd.getOptionValue(OPTION.SOURCE.longOpt), cmd.getOptionValue(OPTION.JAVAC.longOpt), outputPath);
         if (compiledClasses == null) {
             System.out.println("No classes compiled");
             return;
@@ -121,15 +133,18 @@ public class JDKToolsWrapper {
         compiledClasses.keySet().forEach(c -> System.out.printf("Class %s bytes size %d", c, compiledClasses.getOrDefault(c, new byte[0]).length));
     }
 
-    public static Map<String, byte[]> compile(String source, String javacOptions) {
+    static Map<String, byte[]> compile(String source, String javacOptions, Path outputPath) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("tools"));
+        }
+
         System.out.printf("Compiling source file %s with compiler options %s\n", source, javacOptions);
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         if (compiler == null) {
             System.out.println("Java compiler is not supported when running JRE use JDK instead");
             return null;
         }
-        String tmpDir = System.getProperty("java.io.tmpdir");
-        Path outputPath = Paths.get(tmpDir, "src");
         if (!Files.exists(outputPath)) {
             try {
                 Files.createDirectory(outputPath);
@@ -226,7 +241,12 @@ public class JDKToolsWrapper {
      * @param classBytes the byte array representing the class bytes
      * @return the javac -g command line options
      */
-    public static String javap(byte[] classBytes) {
+    static String javap(byte[] classBytes) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("tools"));
+        }
+
         String tmpDir = System.getProperty("java.io.tmpdir");
         Path outputPath = Paths.get(tmpDir, "javapdata");
         Path classFile = outputPath.resolve("Temp.class");

@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2018 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2019 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -31,6 +31,8 @@ var NRS = (function(NRS, $) {
 			"includeCounts": true,
             "adminPassword": NRS.getAdminPassword()
 		}, function(state) {
+			// reset all the fields to prevent artifacts before populating with new values
+			$("span[id^='nrs_node_state_']").empty();
 			for (var key in state) {
 				if (!state.hasOwnProperty(key)) {
 					continue;

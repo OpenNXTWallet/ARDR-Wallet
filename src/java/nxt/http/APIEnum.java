@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -308,7 +308,13 @@ public enum APIEnum {
     SET_CONTRACT_REFERENCE("setContractReference", SetContractReference.instance),
     DELETE_CONTRACT_REFERENCE("deleteContractReference", DeleteContractReference.instance),
     GET_CONTRACT_REFERENCES("getContractReferences", GetContractReferences.instance),
-    CALCULATE_FEE("calculateFee", CalculateFee.instance);
+    CALCULATE_FEE("calculateFee", CalculateFee.instance),
+    GET_ASSET_PROPERTIES("getAssetProperties", GetAssetProperties.instance),
+    SET_ASSET_PROPERTY("setAssetProperty", SetAssetProperty.instance),
+    DELETE_ASSET_PROPERTY("deleteAssetProperty", DeleteAssetProperty.instance),
+    GET_HASHED_SECRET_PHASED_TRANSACTIONS("getHashedSecretPhasedTransactions", GetHashedSecretPhasedTransactions.instance),
+    SPLIT_SECRET("splitSecret", SplitSecret.instance),
+    COMBINE_SECRET("combineSecret", CombineSecret.instance);
 
     private static final Map<String, APIEnum> apiByName = new HashMap<>();
 

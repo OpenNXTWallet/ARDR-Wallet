@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2018 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2019 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -774,7 +774,8 @@ var NRS = (function (NRS, $, undefined) {
         }
         var isUnitsField = /_units/i.test($(this).attr("id"));
         var maxFractionLength = (isUnitsField ? decimals : NRS.getActiveChainDecimals());
-        return NRS.validateDecimals(maxFractionLength, charCode, $(this).val(), e);
+        var caretPos = $(this)[0].selectionStart;
+        return NRS.validateDecimals(maxFractionLength, charCode, $(this).val(), caretPos, e);
     });
 
     var unitFields = $(".currency_units");
@@ -787,7 +788,8 @@ var NRS = (function (NRS, $, undefined) {
         }
         var isUnitsField = /_units/i.test($(this).attr("id"));
         var maxFractionLength = (isUnitsField ? decimals : NRS.getActiveChainDecimals());
-        return NRS.validateDecimals(maxFractionLength, charCode, $(this).val(), e);
+        var caretPos = $(this)[0].selectionStart;
+        return NRS.validateDecimals(maxFractionLength, charCode, $(this).val(), caretPos, e);
     });
 
     unitFields.on("change", function() {
@@ -1338,10 +1340,10 @@ var NRS = (function (NRS, $, undefined) {
             };
         }
 
-        if (!NRS.showedFormWarning) {
+        if (NRS.displayFormWarning["currency_transfer_warning"]) {
             if (NRS.settings["currency_transfer_warning"] && NRS.settings["currency_transfer_warning"] != 0) {
                 if (new Big(data.unitsQNT).cmp(new Big(NRS.settings["currency_transfer_warning"])) > 0) {
-                    NRS.showedFormWarning = true;
+                    NRS.displayFormWarning["currency_transfer_warning"] = false;
                     return {
                         "error": $.t("error_max_currency_transfer_warning", {
                             "qty": String(NRS.settings["currency_transfer_warning"]).escapeHTML()
@@ -1474,7 +1476,8 @@ var NRS = (function (NRS, $, undefined) {
         if (NRS.isControlKey(charCode) || e.ctrlKey || e.metaKey) {
             return;
         }
-        return NRS.validateDecimals(NRS.getActiveChainDecimals(), charCode, $(this).val(), e);
+        var caretPos = $(this)[0].selectionStart;
+        return NRS.validateDecimals(NRS.getActiveChainDecimals(), charCode, $(this).val(), caretPos, e);
     });
 
     reserveCurrencyAmount.blur(function () {
@@ -1534,7 +1537,8 @@ var NRS = (function (NRS, $, undefined) {
         if (NRS.isControlKey(charCode) || e.ctrlKey || e.metaKey) {
             return;
         }
-        return NRS.validateDecimals(decimals, charCode, $(this).val(), e);
+        var caretPos = $(this)[0].selectionStart;
+        return NRS.validateDecimals(decimals, charCode, $(this).val(), caretPos, e);
     });
 
     /* Respect decimal positions on claiming a currency */

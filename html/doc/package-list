@@ -15,11 +15,13 @@ nxt.dbschema
 nxt.dgs
 nxt.env
 nxt.env.service
+nxt.freeze
 nxt.http
 nxt.http.callers
 nxt.http.responses
 nxt.lightcontracts
 nxt.messaging
+nxt.migration
 nxt.ms
 nxt.ms.mint
 nxt.peer
@@ -28,4 +30,5 @@ nxt.taggeddata
 nxt.tools
 nxt.util
 nxt.util.bbh
+nxt.util.security
 nxt.voting

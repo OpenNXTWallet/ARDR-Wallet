@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2018 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2019 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -224,6 +224,10 @@ var NRS = (function(NRS) {
                     // here it's Ok to modify the response since it is only being used for comparison
                     var node = data["_extra"].node;
                     var type = data["_extra"].requestType;
+                    if (!node) {
+                        NRS.logConsole("Node not specified, extra data is " + JSON.stringify(data["_extra"]));
+                        return;
+                    }
                     NRS.logConsole("Confirm request " + type + " with node " + node.announcedAddress);
                     var responseStr = NRS.getComparableResponse(response, type);
                     if (responseStr == expectedResponseStr

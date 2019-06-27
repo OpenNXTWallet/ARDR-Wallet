@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -15,6 +15,8 @@
  */
 
 package nxt.util;
+
+import nxt.util.security.BlockchainPermission;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
@@ -57,10 +59,18 @@ public class TrustAllSSLProvider {
     }
 
     public static HostnameVerifier getHostNameVerifier() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("ssl"));
+        }
         return hostNameVerifier;
     }
 
     public static SSLSocketFactory getSslSocketFactory() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("ssl"));
+        }
         return sslSocketFactory;
     }
 }

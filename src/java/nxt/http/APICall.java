@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -22,28 +22,21 @@ import nxt.blockchain.ChildChain;
 import nxt.http.responses.BlockResponse;
 import nxt.http.responses.TransactionResponse;
 import nxt.util.Convert;
-import nxt.util.Logger;
 import nxt.util.ResourceLookup;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.Part;
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
-import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -52,35 +45,36 @@ import java.util.stream.Collectors;
 
 public class APICall {
 
-    private Map<String, List<String>> params;
-    private Map<String, Part> parts;
-    private boolean isRemote;
-    private URL remoteUrl;
+    private APIConnector apiConnector;
 
     private APICall(Builder builder) {
-        this.params = builder.params;
-        this.parts = builder.parts;
-        if (builder.isRemoteOnly() && !builder.isRemote) {
+        URL remoteUrl = builder.remoteUrl;
+        if (builder.isRemoteOnly() && remoteUrl == null) {
             throw new IllegalArgumentException("API call " + getClass().getName() + " must connect to a remote node");
         }
-        this.isRemote = builder.isRemote;
-        this.remoteUrl = builder.remoteUrl;
+        if (remoteUrl != null) {
+            apiConnector = new APIRemoteConnector(builder.params, builder.parts, remoteUrl, builder.isTrustRemoteCertificate);
+        } else {
+            apiConnector = new APIInProcessConnector(builder.params, builder.parts);
+        }
     }
 
     public static class Builder<T extends Builder> {
-        protected Map<String, List<String>> params = new HashMap<>();
-        List<String> validParams = new ArrayList<>();
+        protected final Map<String, List<String>> params = new HashMap<>();
+        private List<String> validParams = new ArrayList<>();
         private boolean isValidationEnabled = true;
-        private Map<String, Part> parts = new HashMap<>();
-        String validFileParam;
-        String requestType;
-        private boolean isRemote;
+        private final Map<String, byte[]> parts = new HashMap<>();
+        private String validFileParam;
+        private String requestType;
         private URL remoteUrl;
+        private boolean isTrustRemoteCertificate;
 
         public Builder(String requestType) {
             this.requestType = requestType;
             params.put("requestType", Collections.singletonList(requestType));
-            APIServlet.APIRequestHandler apiRequestHandler = APIServlet.getAPIRequestHandler(requestType);
+            APIServlet.APIRequestHandler apiRequestHandler =
+                    AccessController.doPrivileged((PrivilegedAction<APIServlet.APIRequestHandler>) () ->
+                            APIServlet.getAPIRequestHandler(requestType));
             if (apiRequestHandler == null) {
                 throw new IllegalArgumentException("Invalid API " + requestType);
             }
@@ -93,9 +87,13 @@ public class APICall {
         }
 
         public T remote(URL url) {
-            isRemote = url != null;
             remoteUrl = url;
-            return (T)this;
+            return (T) this;
+        }
+
+        public T trustRemoteCertificate(boolean trustRemoteCertificate) {
+            isTrustRemoteCertificate = trustRemoteCertificate;
+            return (T) this;
         }
 
         public boolean isRemoteOnly() {
@@ -104,7 +102,7 @@ public class APICall {
 
         public T setParamValidation(boolean isEnabled) {
             isValidationEnabled = isEnabled;
-            return (T)this;
+            return (T) this;
         }
 
         public T param(String key, String value) {
@@ -123,9 +121,9 @@ public class APICall {
                 throw new IllegalArgumentException(String.format("Empty values parameter %s for requesttype %s", key, requestType));
             }
             params.put(key, values);
-            return (T)this;
+            return (T) this;
         }
-        
+
         public T param(String key, boolean value) {
             return param(key, "" + value);
         }
@@ -140,8 +138,7 @@ public class APICall {
 
         public T param(String key, int... intArray) {
             String[] stringArray = Arrays.stream(intArray).boxed().map(i -> Integer.toString(i)).toArray(String[]::new);
-            param(key, stringArray);
-            return (T)this;
+            return param(key, stringArray);
         }
 
         public T param(String key, long value) {
@@ -150,8 +147,7 @@ public class APICall {
 
         public T param(String key, long... longArray) {
             String[] unsignedLongs = Arrays.stream(longArray).boxed().map(l -> Long.toString(l)).toArray(String[]::new);
-            param(key, unsignedLongs);
-            return (T)this;
+            return param(key, unsignedLongs);
         }
 
         public T unsignedLongParam(String key, long value) {
@@ -160,8 +156,7 @@ public class APICall {
 
         public T unsignedLongParam(String key, long... longArray) {
             String[] unsignedLongs = Arrays.stream(longArray).boxed().map(Long::toUnsignedString).toArray(String[]::new);
-            param(key, unsignedLongs);
-            return (T)this;
+            return param(key, unsignedLongs);
         }
 
         public T param(String key, byte[] value) {
@@ -170,7 +165,7 @@ public class APICall {
 
         public T param(String key, byte[][] value) {
             String[] stringArray = new String[value.length];
-            for (int i=0; i<value.length; i++) {
+            for (int i = 0; i < value.length; i++) {
                 stringArray[i] = Convert.toHexString(value[i]);
             }
             return param(key, stringArray);
@@ -178,6 +173,18 @@ public class APICall {
 
         public T secretPhrase(String value) {
             return param("secretPhrase", value);
+        }
+
+        public T sharedPiece(String... sharedPiece) {
+            return param("sharedPiece", sharedPiece);
+        }
+
+        public T sharedPieceAccount(String value) {
+            return param("sharedPieceAccount", value);
+        }
+
+        public T chain(String chain) {
+            return param("chain", chain);
         }
 
         public T chain(int chainId) {
@@ -194,6 +201,10 @@ public class APICall {
 
         public T recipient(long id) {
             return param("recipient", Long.toUnsignedString(id));
+        }
+
+        public T recipient(String recipient) {
+            return param("recipient", recipient);
         }
 
         public String getParam(String key) {
@@ -216,8 +227,8 @@ public class APICall {
             if (!validFileParam.equals(key)) {
                 throw new IllegalArgumentException(String.format("Invalid file parameter %s for request type %s", key, requestType));
             }
-            parts.put(key, new PartImpl(b));
-            return (T)this;
+            parts.put(key, b);
+            return (T) this;
         }
 
         public APICall build() {
@@ -330,11 +341,7 @@ public class APICall {
     }
 
     public InputStream getInputStream() {
-        if (isRemote) {
-            return getRemoteInputStream();
-        } else {
-            return getLocalInputStream();
-        }
+        return apiConnector.getInputStream();
     }
 
     public byte[] getBytes() {
@@ -345,136 +352,68 @@ public class APICall {
         }
     }
 
-    public JSONObject invoke() {
-        if (isRemote) {
-            return invokeRemote();
-        } else {
-            return invokeLocal();
-        }
+    public InvocationError invokeWithError() {
+        JSONObject actual = invoke();
+        return new InvocationError(actual);
     }
 
-    private InputStream getRemoteInputStream() {
-        StringBuilder postData = new StringBuilder();
-        try {
-            for (Map.Entry<String, List<String>> param : params.entrySet()) {
-                if (postData.length() != 0) {
-                    postData.append('&');
-                }
-                postData.append(URLEncoder.encode(param.getKey(), "UTF-8"));
-                postData.append('=');
-                String value = String.join(",", param.getValue());
-                postData.append(URLEncoder.encode(value, "UTF-8"));
-            }
-            byte[] postDataBytes = postData.toString().getBytes(StandardCharsets.UTF_8);
 
-            HttpURLConnection connection = (HttpURLConnection)remoteUrl.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-            connection.setRequestProperty("Content-Length", String.valueOf(postDataBytes.length));
-            connection.setDoOutput(true);
-            connection.getOutputStream().write(postDataBytes);
-            if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                return connection.getInputStream();
-            } else {
-                Logger.logInfoMessage("response code %d", connection.getResponseCode());
-                throw new IllegalStateException("Connection failed response code " + connection.getResponseCode());
+    public JSONObject invokeNoError() {
+        JSONObject actual = invoke();
+
+        assertNull(actual.get("errorDescription"));
+        assertNull(actual.get("errorCode"));
+
+        return actual;
+    }
+
+    public JSONObject invoke() {
+        return AccessController.doPrivileged((PrivilegedAction<JSONObject>) this::invokeImpl);
+    }
+
+    private JSONObject invokeImpl() {
+        try {
+            InputStream inputStream = apiConnector.getInputStream();
+            try (Reader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                return (JSONObject) JSONValue.parseWithException(reader); // Parse the response into Json object
             }
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
     }
 
-    private JSONObject invokeRemote() {
-        try {
-            InputStream inputStream = getRemoteInputStream();
-            try (Reader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-                return (JSONObject)JSONValue.parseWithException(reader); // Parse the response into Json object
-            }
-        } catch (Exception e) {
-            if (e instanceof IllegalStateException) {
-                throw (IllegalStateException)e;
-            } else {
-                throw new IllegalStateException(e);
-            }
+    private static void assertNull(Object o) {
+        if (o != null) {
+            throw new AssertionError("Expected null, got: " + o);
         }
     }
 
-    private InputStream getLocalInputStream() {
-        Logger.logDebugMessage("%s: request %s", params.get("requestType"), params);
-        HttpServletRequest req = new MockedRequest(params, parts);
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        HttpServletResponse resp = new MockedResponse(out);
-        try {
-            APIServlet apiServlet = new APIServlet();
-            apiServlet.doPost(req, resp);
-            return new ByteArrayInputStream(out.toByteArray());
-        } catch (IOException e) {
-             throw new IllegalStateException();
+    private static <T> T assertNotNull(T o) {
+        if (o == null) {
+            throw new AssertionError("Expected not null");
         }
+        return o;
     }
 
-    private JSONObject invokeLocal() {
-        JSONObject response = (JSONObject) JSONValue.parse(new InputStreamReader(getLocalInputStream()));
-        Logger.logDebugMessage("%s: response %s", params.get("requestType"), response);
-        return response;
-    }
+    public static class InvocationError {
+        private JSONObject jsonObject;
 
-    static class PartImpl implements Part {
-
-        private final byte[] bytes;
-
-        PartImpl(byte[] bytes) {
-            this.bytes = bytes;
+        public InvocationError(JSONObject jsonObject) {
+            this.jsonObject = jsonObject;
         }
 
-        @Override
-        public InputStream getInputStream() {
-            return new ByteArrayInputStream(bytes);
+        public String getErrorCode() {
+            return str("errorCode");
         }
 
-        @Override
-        public String getContentType() {
-            return null;
+        public String getErrorDescription() {
+            return str("errorDescription");
         }
 
-        @Override
-        public String getName() {
-            return "testName";
-        }
-
-        @Override
-        public String getSubmittedFileName() {
-            return "testSubmittedFileName";
-        }
-
-        @Override
-        public long getSize() {
-            return bytes.length;
-        }
-
-        @Override
-        public void write(String s) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void delete() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public String getHeader(String s) {
-            return null;
-        }
-
-        @Override
-        public Collection<String> getHeaders(String s) {
-            return null;
-        }
-
-        @Override
-        public Collection<String> getHeaderNames() {
-            return null;
+        private String str(String errorCode) {
+            return (String) assertNotNull(jsonObject.get(errorCode));
         }
     }
 }

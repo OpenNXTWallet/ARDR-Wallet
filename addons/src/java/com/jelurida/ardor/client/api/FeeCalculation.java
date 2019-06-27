@@ -1,3 +1,18 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package com.jelurida.ardor.client.api;
 
 import nxt.addons.JO;
@@ -7,12 +22,13 @@ import nxt.http.callers.GetBundlerRatesCall;
 import nxt.http.callers.SendMoneyCall;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 
 /**
- * Show how to calculate best bundling fee for child chain transactions
+ * Sample Java program which demonstrates how to calculate best bundling fee for child chain transactions
  */
 public class FeeCalculation {
 
@@ -25,7 +41,7 @@ public class FeeCalculation {
         JO transactionResponse = feeCalculation.prepare(remoteUrl, chain.getId());
         long minimumParentChainFeeFQT = transactionResponse.getLong("minimumFeeFQT");
         long feeRateNQTPerFXT = feeCalculation.getBestBundlingFee(remoteUrl, minimumParentChainFeeFQT, chain.getId());
-        long feeNQT = BigDecimal.valueOf(minimumParentChainFeeFQT).multiply(BigDecimal.valueOf(feeRateNQTPerFXT)).divide(BigDecimal.valueOf(chain.ONE_COIN), BigDecimal.ROUND_HALF_EVEN).longValue();
+        long feeNQT = BigDecimal.valueOf(minimumParentChainFeeFQT).multiply(BigDecimal.valueOf(feeRateNQTPerFXT)).divide(BigDecimal.valueOf(chain.ONE_COIN), RoundingMode.HALF_EVEN).longValue();
         System.out.printf("calculatedFee: %d\n", feeNQT);
         JO submittedTransaction = feeCalculation.submit(remoteUrl, chain.getId(), feeNQT);
         System.out.printf("submittedTransaction: %s\n", submittedTransaction);

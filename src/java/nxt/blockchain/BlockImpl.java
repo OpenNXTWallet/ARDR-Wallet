@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -391,14 +391,16 @@ public final class BlockImpl implements Block {
                 }
                 totalBackFees += backFees[i];
                 Account previousGeneratorAccount = Account.getAccount(BlockDb.findBlockAtHeight(this.height - i - 1).getGeneratorId());
-                Logger.logDebugMessage("Back fees %f %s to forger at height %d", ((double)backFees[i])/Constants.ONE_FXT, FxtChain.FXT_NAME, this.height - i - 1);
+                //Logger.logDebugMessage("Back fees %f %s to forger at height %d", ((double)backFees[i])/Constants.ONE_FXT, FxtChain.FXT_NAME, this.height - i - 1);
                 previousGeneratorAccount.addToBalanceAndUnconfirmedBalance(FxtChain.FXT, LedgerEvent.BLOCK_GENERATED, eventId, backFees[i]);
                 previousGeneratorAccount.addToForgedBalanceFQT(backFees[i]);
             }
         }
+        /*
         if (totalBackFees != 0) {
             Logger.logDebugMessage("Fee reduced by %f %s at height %d", ((double)totalBackFees)/Constants.ONE_FXT, FxtChain.FXT_NAME, this.height);
         }
+        */
         generatorAccount.addToBalanceAndUnconfirmedBalance(FxtChain.FXT, LedgerEvent.BLOCK_GENERATED, eventId, totalFeeFQT - totalBackFees);
         generatorAccount.addToForgedBalanceFQT(totalFeeFQT - totalBackFees);
     }
@@ -440,22 +442,25 @@ public final class BlockImpl implements Block {
                 BigInteger.valueOf(prevBaseTarget).multiply(BigInteger.valueOf(this.timestamp - previousBlock.timestamp))));
         int blockchainHeight = previousBlock.height;
         if (blockchainHeight > 2 && blockchainHeight % 2 == 0) {
+            int acceleration = Constants.isTestnet ? height > Constants.MPG_BLOCK ? Constants.TESTNET_ACCELERATION : 1 : 1;
+            int targetBlocktime = Constants.BLOCK_TIME / acceleration;
             BlockImpl block = BlockDb.findBlockAtHeight(blockchainHeight - 2);
             int blocktimeAverage = (this.timestamp - block.timestamp) / 3;
-            if (blocktimeAverage > Constants.BLOCK_TIME) {
-                baseTarget = (prevBaseTarget * Math.min(blocktimeAverage, Constants.MAX_BLOCKTIME_LIMIT)) / Constants.BLOCK_TIME;
+            if (blocktimeAverage > targetBlocktime) {
+                baseTarget = (prevBaseTarget * Math.min(blocktimeAverage, targetBlocktime + Constants.MAX_BLOCKTIME_DELTA)) / targetBlocktime;
             } else {
                 baseTarget = prevBaseTarget - prevBaseTarget * Constants.BASE_TARGET_GAMMA
-                        * (Constants.BLOCK_TIME - Math.max(blocktimeAverage, Constants.MIN_BLOCKTIME_LIMIT)) / (100 * Constants.BLOCK_TIME);
+                        * (targetBlocktime - Math.max(blocktimeAverage, targetBlocktime - Constants.MIN_BLOCKTIME_DELTA)) / (100 * targetBlocktime);
             }
-            if (baseTarget < 0 || baseTarget > Constants.MAX_BASE_TARGET) {
-                baseTarget = Constants.MAX_BASE_TARGET;
+            if (baseTarget < 0 || baseTarget > Constants.MAX_BASE_TARGET * acceleration) {
+                baseTarget = Constants.MAX_BASE_TARGET * acceleration;
             }
-            if (baseTarget < Constants.MIN_BASE_TARGET) {
-                baseTarget = Constants.MIN_BASE_TARGET;
+            if (baseTarget < Constants.MIN_BASE_TARGET * acceleration) {
+                baseTarget = Constants.MIN_BASE_TARGET * acceleration;
             }
         } else {
             baseTarget = prevBaseTarget;
         }
     }
+
 }

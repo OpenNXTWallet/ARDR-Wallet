@@ -1,27 +1,47 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package nxt.addons;
 
 import nxt.Nxt;
-import nxt.account.Account;
+import nxt.account.AccountRestrictions;
 import nxt.blockchain.Block;
+import nxt.blockchain.Blockchain;
 import nxt.blockchain.ChildChain;
 import nxt.blockchain.FxtChain;
 import nxt.crypto.Crypto;
-import nxt.crypto.EncryptedData;
 import nxt.http.APICall;
+import nxt.http.JSONData;
 import nxt.http.callers.GetConstantsCall;
 import nxt.http.responses.BlockResponse;
 import nxt.util.Convert;
 import nxt.util.Logger;
+import nxt.voting.VoteWeighting;
 import org.json.simple.JSONValue;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
+import java.security.AccessController;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.Permission;
+import java.security.PrivilegedAction;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.locks.ReentrantLock;
 
 public abstract class AbstractContractContext {
 
@@ -32,6 +52,9 @@ public abstract class AbstractContractContext {
     protected static final int VALIDATE_SAME_CHAIN = 1013;
     protected static final int FEE_CANNOT_CALCULATE = 1021;
     protected static final int FEE_EXCEEDS_AMOUNT = 1022;
+    protected static final int MESSAGE_TO_ENCRYPT_WITHOUT_SECRET_PHRASE = 1031;
+
+    private final Blockchain blockchain = AccessController.doPrivileged((PrivilegedAction<Blockchain>)Nxt::getBlockchain);
 
     public enum EventSource { BLOCK, TRANSACTION, REQUEST, VOUCHER, NONE;
 
@@ -66,30 +89,41 @@ public abstract class AbstractContractContext {
         chainByName = Collections.unmodifiableMap(byName);
     }
 
-
     protected EventSource source;
     protected ContractRunnerConfig config;
+    private JO contractSetupParameters;
     protected final String contractName;
+    private final String logMessagePrefix;
     private JO response;
     private RandomnessSource randomnessSource;
-
-    private static final ReentrantLock contextLock = new ReentrantLock();
 
     private static volatile JO blockchainConstants;
 
     AbstractContractContext(ContractRunnerConfig config, String contractName) {
         this.config = config;
         this.contractName = contractName;
+        this.logMessagePrefix = "{" + contractName + "} ";
         if (blockchainConstants == null) {
-            contextLock.lock();
-            try {
-                if (blockchainConstants == null) {
-                    blockchainConstants = GetConstantsCall.create().call();
-                }
-            } finally {
-                contextLock.unlock();
-            }
+            initBlockchainConstants();
         }
+    }
+
+    private static synchronized void initBlockchainConstants() {
+        if (blockchainConstants == null) {
+            blockchainConstants = GetConstantsCall.create().call();
+        }
+    }
+
+    public <T extends AbstractContractContext> T getContext() {
+        return (T)this;
+    }
+
+    /**
+     * Returns the contract name
+     * @return the contract name
+     */
+    public String getContractName() {
+        return contractName;
     }
 
     /**
@@ -164,6 +198,38 @@ public abstract class AbstractContractContext {
     }
 
     /**
+     * Returns the contract runner account as unsigned long number
+     * @return the account id
+     */
+    public String getAccount() {
+        return getConfig().getAccount();
+    }
+
+    /**
+     * Returns the contract runner account in Reed Solomon format
+     * @return the account id
+     */
+    public String getAccountRs() {
+        return getConfig().getAccountRs();
+    }
+
+    /**
+     * Returns the public key as byte array
+     * @return the public key
+     */
+    public byte[] getPublicKey() {
+        return getConfig().getPublicKey();
+    }
+
+    /**
+     * Returns the public key in hex string format
+     * @return the public key
+     */
+    public String getPublicKeyHexString() {
+        return getConfig().getPublicKeyHexString();
+    }
+
+    /**
      * Returns a Json object representing the response of the getConstants API call
      * @return a Json object
      */
@@ -180,43 +246,64 @@ public abstract class AbstractContractContext {
     }
 
     /**
-     * Set the response of the contract invocation
+     * Generate response of the contract invocation
      * @param response the Json object which represents the contract invocation response
+     * @return the generated response
      */
-    public void setResponse(JO response) {
+    public JO generateResponse(JO response) {
         if (this.response != null) {
             throw new IllegalStateException("Response already set: " + this.response.toJSONString());
         }
         this.response = response;
+        return response;
     }
 
     /**
-     * Set the response of the contract invocation to an error condition
+     * Generate info response for the contract invocation
+     * @param description the description as a string format
+     * @param args the description string format arguments
+     * @return the generated info response
+     */
+    public JO generateInfoResponse(String description, Object... args) {
+        if (response == null) {
+            response = new JO();
+        } else {
+            throw new IllegalStateException("Response already set: " + this.response.toJSONString());
+        }
+        response.put("info", String.format(description, args));
+        Logger.logInfoMessage(response.toJSONString());
+        return response;
+    }
+
+    /**
+     * Generate error response for the contract invocation
      * @param code the error code
      * @param description the error description as a string format
      * @param args the description string format arguments
+     * @return the generated error response
      */
-    public void setErrorResponse(int code, String description, Object... args) {
+    public JO generateErrorResponse(int code, String description, Object... args) {
         if (code < INTERNAL_ERROR_CODE_THRESHOLD) {
             throw new IllegalArgumentException("Error codes below " + INTERNAL_ERROR_CODE_THRESHOLD + " are reserved for internal usage");
         }
-        setErrorResponseImpl(code, description, args);
+        return generateErrorResponseImpl(code, description, args);
     }
 
-    protected void setInternalErrorResponse(int code, String description, Object... args) {
+    protected JO generateInternalErrorResponse(int code, String description, Object... args) {
         if (code >= INTERNAL_ERROR_CODE_THRESHOLD) {
             throw new IllegalArgumentException("Error codes above " + INTERNAL_ERROR_CODE_THRESHOLD + " are reserved for contract usage");
         }
-        setErrorResponseImpl(code, description, args);
+        return generateErrorResponseImpl(code, description, args);
     }
 
-    private void setErrorResponseImpl(int code, String description, Object... args) {
+    private JO generateErrorResponseImpl(int code, String description, Object... args) {
         if (response == null) {
             response = new JO();
         }
         response.put("errorCode", code);
         response.put("errorDescription", String.format(description, args));
         Logger.logErrorMessage(response.toJSONString());
+        return response;
     }
 
     protected JO addTriggerData(JO jo) {
@@ -248,15 +335,13 @@ public abstract class AbstractContractContext {
     public JO createTransaction(APICall.Builder builder, boolean reduceFeeFromAmount) {
         long feeNQT = getTransactionFee(builder);
         if (feeNQT < 0) {
-            setInternalErrorResponse(FEE_CANNOT_CALCULATE,"%s: cannot calculate fee", getClass().getName());
-            return response;
+            return generateInternalErrorResponse(FEE_CANNOT_CALCULATE,"%s: cannot calculate fee, perhaps feeRateNQTPerFXT not defined for chain %s in contract runner configuration", contractName, builder.getParam("chain"));
         } else {
             builder.param("feeNQT", feeNQT);
             if (reduceFeeFromAmount && builder.isParamSet("amountNQT")) {
                 long amountNQT = Long.parseLong(builder.getParam("amountNQT"));
                 if (feeNQT > amountNQT) {
-                    setInternalErrorResponse(FEE_EXCEEDS_AMOUNT,"%s: calculated fee %d bigger than amount %d", getClass().getName(), feeNQT, amountNQT);
-                    return response;
+                    return generateInternalErrorResponse(FEE_EXCEEDS_AMOUNT,"%s: calculated fee %d bigger than amount %d", getClass().getName(), feeNQT, amountNQT);
                 }
                 builder.param("amountNQT", Math.subtractExact(amountNQT, feeNQT));
             }
@@ -264,14 +349,15 @@ public abstract class AbstractContractContext {
         JO transactionResponse = createTransactionImpl(builder);
         if (response == null) {
             response = new JO();
+        } else if (response.isExist("errorCode")) {
+            return response;
         }
         if (!response.isExist("transactions")) {
-            JA transactions = new JA();
-            response.put("transactions", transactions);
+            response.put("transactions", new JA());
         }
         JA transactions = response.getArray("transactions");
         transactions.add(transactionResponse);
-        return transactionResponse;
+        return response;
     }
 
     private long getTransactionFee(APICall.Builder builder) {
@@ -290,7 +376,9 @@ public abstract class AbstractContractContext {
             return feeFQT;
         }
         long feeRatio = config.getFeeRateNQTPerFXT(chainId);
-        return BigDecimal.valueOf(feeFQT).multiply(BigDecimal.valueOf(feeRatio)).divide(BigDecimal.valueOf(chain.getOneCoin()), BigDecimal.ROUND_HALF_EVEN).longValue();
+        // TODO can we reliably calculate the minimum fee here and not require the user to specify it in the contract runner config?
+        // What if we force the contract runner to be a bundler which bundles its own transactions?
+        return BigDecimal.valueOf(feeFQT).multiply(BigDecimal.valueOf(feeRatio)).divide(BigDecimal.valueOf(chain.getOneCoin()), RoundingMode.HALF_EVEN).longValue();
     }
 
     private JO createTransactionImpl(APICall.Builder builder) {
@@ -305,33 +393,63 @@ public abstract class AbstractContractContext {
         builder.param("message", message);
         builder.param("messageIsPrunable", "true");
         if (!builder.isParamSet("secretPhrase")) {
+            if (builder.isParamSet("messageToEncrypt")) {
+                return generateInternalErrorResponse(MESSAGE_TO_ENCRYPT_WITHOUT_SECRET_PHRASE,"%s: do not use the messageToEncrypt parameter, encrypt the data yourself and submit the encryptedMessageData and encryptedMessageNonce instead", getClass().getName());
+            }
             builder.param("publicKey", config.getPublicKeyHexString());
         }
+        int chainId = Integer.parseInt(builder.getParam("chain"));
         if (!builder.isParamSet("feeNQT")) {
-            int chainId = Integer.parseInt(builder.getParam("chain"));
             if (chainById.get(chainId).isChildChain()) {
                 builder.param("feeRateNQTPerFXT", config.getFeeRateNQTPerFXT(chainId));
             }
         }
-        Block lastBlock = Nxt.getBlockchain().getLastBlock();
+        Block lastBlock = blockchain.getLastBlock();
         builder.param("ecBlockHeight", lastBlock.getHeight());
         builder.param("ecBlockId", Long.toUnsignedString(lastBlock.getId()));
         builder.param("timestamp", lastBlock.getTimestamp());
         String referencedTransaction = getReferencedTransaction();
-        if (referencedTransaction != null) {
+        if (referencedTransaction != null && chainById.get(chainId).isChildChain()) {
             builder.param("referencedTransaction", referencedTransaction);
+        }
+        AccountRestrictions.PhasingOnly phasingOnly =
+                AccessController.doPrivileged((PrivilegedAction<AccountRestrictions.PhasingOnly>) () ->
+                        AccountRestrictions.PhasingOnly.get(config.getAccountId()));
+        if (phasingOnly != null) {
+            builder.param("phased", "true");
+            // Set to minimum possible height to allow enough time for approval. Came up with +4 after experimentation.
+            // The transaction is included in the next block, needs 2 more blocks for vote counting and one block to give a chance to approve it
+            builder.param("phasingFinishHeight", getBlockchainHeight() + phasingOnly.getMinDuration() + 4);
+            JO phasingOnlyJson = new JO(JSONData.phasingOnly(phasingOnly));
+            builder.param("phasingParams", phasingOnlyJson.getJo("controlParams").toJSONString());
+        } else {
+            JO triggerPhasingAttachmentJson = getPhasingAttachment();
+            if (triggerPhasingAttachmentJson != null) {
+                if (VoteWeighting.VotingModel.get(triggerPhasingAttachmentJson.getByte("phasingVotingModel")) == VoteWeighting.VotingModel.HASH) {
+                    builder.param("phased", "true");
+                    // When phasing by secret hash is used by a trigger transaction, the contract transaction will always finish at the same height as the trigger transaction.
+                    // This way when a secret is revealed it will always approve both transactions
+                    builder.param("phasingFinishHeight", triggerPhasingAttachmentJson.getInt("phasingFinishHeight"));
+                    // All other phasing params should remain the same as the params in the trigger transaction
+                    builder.param("phasingParams", triggerPhasingAttachmentJson.toJSONString());
+                }
+            }
         }
         APICall apiCall = builder.build();
         return apiCall.getJsonResponse();
     }
 
+    protected JO getPhasingAttachment() {
+        return null;
+    }
+
     /**
      * Load a contract instance from the blockchain cloud data based on the contract reference name
-     * @param name the contract reference name for the contract runnner account
+     * @param name the contract reference name for the contract runner account
      * @return an instance of the contract class stored in the blockchain as cloud data
      */
-    public Contract loadContract(String name) {
-        Contract contract = getConfig().getContractProvider().getContract(name);
+    public ContractAndSetupParameters loadContract(String name) {
+        ContractAndSetupParameters contract = getConfig().getContractProvider().getContract(name);
         if (contract == null) {
             throw new IllegalArgumentException("Contract " + name + " not loaded by the contract runner");
         }
@@ -382,30 +500,6 @@ public abstract class AbstractContractContext {
      */
     public boolean verify(byte[] signature, byte[] message, byte[] publicKey) {
         return Crypto.verify(signature, message, publicKey);
-    }
-
-    /**
-     * Encrypt message sent to specific account
-     * @param publicKey the recipient public key
-     * @param data the message bytes
-     * @param senderSecretPhrase the secret phrase of the sender
-     * @param compress the compression mode
-     * @return the encrypted data
-     */
-    public EncryptedData encryptTo(byte[] publicKey, byte[] data, String senderSecretPhrase, boolean compress) {
-        return Account.encryptTo(publicKey, data, senderSecretPhrase, compress);
-    }
-
-    /**
-     * Decrypt message sent to a specific account
-     * @param publicKey the sender account public key
-     * @param encryptedData the encrypted message object
-     * @param recipientSecretPhrase the recipient account secret phrase
-     * @param uncompress the compression mode
-     * @return the decrypted message bytes
-     */
-    public byte[] decryptFrom(byte[] publicKey, EncryptedData encryptedData, String recipientSecretPhrase, boolean uncompress) {
-        return Account.decryptFrom(publicKey, encryptedData, recipientSecretPhrase, uncompress);
     }
 
     /**
@@ -490,7 +584,7 @@ public abstract class AbstractContractContext {
     }
 
     public int getBlockchainHeight() {
-        return Nxt.getBlockchain().getHeight();
+        return blockchain.getHeight();
     }
 
     /**
@@ -499,7 +593,7 @@ public abstract class AbstractContractContext {
      * @param args the format arguments
      */
     public void logInfoMessage(String format, Object... args) {
-        Logger.logInfoMessage(String.format(format, args));
+        Logger.logInfoMessage(logMessagePrefix + format, args);
     }
 
     /**
@@ -507,7 +601,7 @@ public abstract class AbstractContractContext {
      * @param t the throwable object
      */
     public void logErrorMessage(Throwable t) {
-        Logger.logErrorMessage(t.toString(), t);
+        Logger.logErrorMessage(logMessagePrefix + t.toString(), t);
     }
 
     /**
@@ -537,4 +631,35 @@ public abstract class AbstractContractContext {
         return Crypto.getPublicKey(secretPhrase);
     }
 
+    /**
+     * Check with the Security Manager if the contract code has a specific permission
+     * @param permission the permission to check
+     * @return true if permission is granted, false otherwise
+     */
+    public boolean isPermissionGranted(Permission permission) {
+        try {
+            System.getSecurityManager().checkPermission(permission);
+            return true;
+        } catch (SecurityException e) {
+            return false;
+        }
+    }
+
+    public JO getRuntimeParams() {
+        return new JO();
+    }
+
+    public JO getContractSetupParameters() {
+        return contractSetupParameters;
+    }
+
+    public <Params> Params getParams(Class<Params> clazz) {
+        JO runnerConfigParams = getContractRunnerConfigParams(getContractName());
+        JO invocationParams = getRuntimeParams();
+        return ParamInvocationHandler.getParams(clazz, runnerConfigParams, contractSetupParameters, invocationParams);
+    }
+
+    public void setContractSetupParameters(JO contractSetupParameters) {
+        this.contractSetupParameters = contractSetupParameters;
+    }
 }

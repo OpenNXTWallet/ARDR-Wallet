@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -37,6 +37,10 @@ import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.BeforeClass;
 
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -74,25 +78,27 @@ public abstract class BlockchainTest extends AbstractBlockchainTest {
 
     public static void initNxt(Map<String, String> additionalProperties) {
         if (!isNxtInitialized) {
-            Properties properties = ManualForgingTest.newTestProperties();
-            properties.setProperty("nxt.isTestnet", "true");
-            properties.setProperty("nxt.isAutomatedTest", "true");
-            properties.setProperty("nxt.isOffline", "true");
-            properties.setProperty("nxt.enableFakeForging", "true");
-            properties.setProperty("nxt.fakeForgingPublicKeys", forgerPublicKey + ";" + rikerPublicKey);
-            properties.setProperty("nxt.timeMultiplier", "1");
-            properties.setProperty("nxt.testnetGuaranteedBalanceConfirmations", "1");
-            properties.setProperty("nxt.testnetLeasingDelay", "1");
-            properties.setProperty("nxt.disableProcessTransactionsThread", "true");
-            properties.setProperty("nxt.deleteFinishedShufflings", "false");
-            properties.setProperty("nxt.disableSecurityPolicy", "true");
-            properties.setProperty("nxt.disableAdminPassword", "true");
-            properties.setProperty("nxt.testDbDir", "./nxt_unit_test_db/nxt");
+            AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
+                Properties properties = ManualForgingTest.newTestProperties();
+                properties.setProperty("nxt.isTestnet", "true");
+                properties.setProperty("nxt.isAutomatedTest", "true");
+                properties.setProperty("nxt.isOffline", "true");
+                properties.setProperty("nxt.enableFakeForging", "true");
+                properties.setProperty("nxt.fakeForgingPublicKeys", forgerPublicKey + ";" + rikerPublicKey);
+                properties.setProperty("nxt.timeMultiplier", "1");
+                properties.setProperty("nxt.testnetGuaranteedBalanceConfirmations", "1");
+                properties.setProperty("nxt.testnetLeasingDelay", "1");
+                properties.setProperty("nxt.disableProcessTransactionsThread", "true");
+                properties.setProperty("nxt.deleteFinishedShufflings", "false");
+                properties.setProperty("nxt.disableAdminPassword", "true");
+                properties.setProperty("nxt.testDbDir", "./nxt_unit_test_db/nxt");
+                properties.setProperty("nxt.secretPhrasePieces.ARDOR-XK4R-7VJU-6EQG-7R335", "1:9999:3:2:0:2:01d8ce9df0a2bbc29140a56211262d9449d501508b1c5547e5");
 
-            additionalProperties.forEach(properties::setProperty);
-
-            AbstractForgingTest.init(properties);
-            isNxtInitialized = true;
+                additionalProperties.forEach(properties::setProperty);
+                AbstractForgingTest.init(properties);
+                isNxtInitialized = true;
+                return null;
+            });
         }
     }
     
@@ -106,22 +112,28 @@ public abstract class BlockchainTest extends AbstractBlockchainTest {
     @AfterClass
     public static void shutdownNxt() {
         if (!isRunInSuite) {
-            Nxt.shutdown();
+            AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
+                Nxt.shutdown();
+                return null;
+            });
         }
     }
 
     protected static void initBlockchainTest() {
-        Nxt.setTime(new Time.CounterTime(Nxt.getEpochTime()));
-        fundTestAccounts();
-        Nxt.getBlockchainProcessor().popOffTo(baseHeight);
-        Logger.logMessage("baseHeight: " + baseHeight);
-        FORGY = new Tester(forgerSecretPhrase);
-        ALICE = new Tester(aliceSecretPhrase);
-        BOB = new Tester(bobSecretPhrase2);
-        CHUCK = new Tester(chuckSecretPhrase);
-        DAVE = new Tester(daveSecretPhrase);
-        RIKER = new Tester(rikerSecretPhrase);
-        startBundlers();
+        AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
+            Nxt.setTime(new Time.CounterTime(Nxt.getEpochTime()));
+            fundTestAccounts();
+            Nxt.getBlockchainProcessor().popOffTo(baseHeight);
+            Logger.logMessage("baseHeight: " + baseHeight);
+            FORGY = new Tester(forgerSecretPhrase);
+            ALICE = new Tester(aliceSecretPhrase);
+            BOB = new Tester(bobSecretPhrase2);
+            CHUCK = new Tester(chuckSecretPhrase);
+            DAVE = new Tester(daveSecretPhrase);
+            RIKER = new Tester(rikerSecretPhrase);
+            startBundlers();
+            return null;
+        });
     }
 
     private static void fundTestAccounts() {
@@ -189,14 +201,16 @@ public abstract class BlockchainTest extends AbstractBlockchainTest {
                     param("totalFeesLimitFQT", 20000 * chain.ONE_COIN * factor). // Forgy has only 24K Ignis
                     param("overpayFQTPerFXT", 0).
                     build().invoke();
-            Logger.logDebugMessage("startBundler: " + response);
         }
     }
 
     @After
     public void destroy() {
-        TransactionProcessorImpl.getInstance().clearUnconfirmedTransactions();
-        blockchainProcessor.popOffTo(baseHeight);
+        AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
+            TransactionProcessorImpl.getInstance().clearUnconfirmedTransactions();
+            blockchainProcessor.popOffTo(baseHeight);
+            return null;
+        });
     }
 
     public static void generateBlock() {
@@ -209,8 +223,11 @@ public abstract class BlockchainTest extends AbstractBlockchainTest {
 
     private static void generateBlock(String forgerSecretPhrase) {
         try {
-            blockchainProcessor.generateBlock(forgerSecretPhrase, Nxt.getEpochTime());
-        } catch (BlockchainProcessor.BlockNotAcceptedException e) {
+            AccessController.doPrivileged((PrivilegedExceptionAction<Void>) () -> {
+                blockchainProcessor.generateBlock(forgerSecretPhrase, Nxt.getEpochTime());
+                return null;
+            });
+        } catch (PrivilegedActionException e) {
             e.printStackTrace();
             Assert.fail();
         }

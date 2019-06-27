@@ -1,7 +1,6 @@
 // Auto generated code, do not modify
 package nxt.http.callers;
 
-import java.lang.String;
 import nxt.http.APICall;
 
 public class GetSupportedContractsCall extends APICall.Builder<GetSupportedContractsCall> {
@@ -19,9 +18,5 @@ public class GetSupportedContractsCall extends APICall.Builder<GetSupportedContr
 
     public GetSupportedContractsCall requireBlock(String requireBlock) {
         return param("requireBlock", requireBlock);
-    }
-
-    public GetSupportedContractsCall adminPassword(String adminPassword) {
-        return param("adminPassword", adminPassword);
     }
 }

@@ -1,3 +1,18 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package com.jelurida.ardor.client.api;
 
 import nxt.Nxt;
@@ -6,16 +21,15 @@ import nxt.configuration.Setup;
 import nxt.http.callers.SendMoneyCall;
 
 /**
- * Use APIs locally without relying on a remote node
+ * Sample Java program which demonstrates use of APIs locally without relying on a remote node
  */
 public class InProcessApiCalls {
 
     private static final String SECRET_PHRASE = "hope peace happen touch easy pretend worthless talk them indeed wheel state";
 
     public static void main(String[] args) {
+        // This code will start the node, so make sure it is not already running or you'll receive a BindException
         Nxt.init(Setup.COMMAND_LINE_TOOL);
-
-        // start the node, so make sure it is not already running or you'll receive a BindException
         try {
             InProcessApiCalls inProcessApiCalls = new InProcessApiCalls();
             inProcessApiCalls.submit();

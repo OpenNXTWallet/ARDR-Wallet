@@ -1,58 +1,86 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package com.jelurida.ardor.contracts;
 
 import nxt.addons.AbstractContract;
-import nxt.addons.TransactionContext;
+import nxt.addons.ContractInvocationParameter;
+import nxt.addons.ContractParametersProvider;
 import nxt.addons.JA;
 import nxt.addons.JO;
 import nxt.addons.RandomnessSource;
+import nxt.addons.TransactionContext;
+import nxt.addons.ValidateContractRunnerIsRecipient;
+import nxt.addons.ValidateContractRunnerIsSender;
 import nxt.http.callers.GetAccountPropertiesCall;
 import nxt.http.callers.SetAccountPropertyCall;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Sample contract which sets a property based on random selection.
+ * Warning:
+ * This design is inappropriate for gambling applications. The reason is that users can trigger this contract using a phased
+ * transaction and later not approve the trigger and response transactions in case they do not like the results.
+ * For a better approach to lottery application see the AllForOnePayment sample contract.
+ */
 public class PropertyBasedLottery extends AbstractContract {
 
-    @Override
-    public void processTransaction(TransactionContext context) {
-        selectWinner(context);
+    @ContractParametersProvider
+    public interface Params {
+        @ContractInvocationParameter
+        String property();
     }
 
-    private void selectWinner(TransactionContext context) {
-        if (context.notSameRecipient() || context.notSameSender()) {
-            return;
+    @Override
+    @ValidateContractRunnerIsRecipient
+    @ValidateContractRunnerIsSender
+    public JO processTransaction(TransactionContext context) {
+        return selectWinner(context);
+    }
+
+    private JO selectWinner(TransactionContext context) {
+        String property = context.getParams(Params.class).property();
+        if (property == null) {
+            return context.generateErrorResponse(10001, "Property based on which to perform the lottery not specified in contract params");
         }
-        String propertyKey = context.getRuntimeParams().getString("property");
-        if (propertyKey == null) {
-            context.setErrorResponse(10001, "Property based on which to perform the lottery not specified in contract params");
-            return;
-        }
-        String accountRS = context.getConfig().getAccountRs();
+        String accountRS = context.getAccountRs();
         JO getAccountProperties = GetAccountPropertiesCall.create().
-                property(propertyKey).
+                property(property).
                 setter(accountRS).
                 call();
         JA properties = getAccountProperties.getArray("properties");
         if (properties.size() == 0) {
-            context.setErrorResponse(10002, "No accounts with property %s set by %s found", propertyKey, context.getConfig().getAccountRs());
-            return;
+            return context.generateErrorResponse(10002, "No accounts with property %s set by %s found", property, accountRS);
         }
         List<JO> nonWinners = properties.objects().stream().filter(p ->  {
             String value = p.getString("value");
             return value == null || !value.startsWith("winner");
         }).collect(Collectors.toList());
         if (nonWinners.size() == 0) {
-            context.setErrorResponse(10003, "No non-winning accounts found");
-            return;
+            return context.generateErrorResponse(10003, "No non-winning accounts found");
         }
         RandomnessSource r = context.initRandom(context.getRandomSeed());
         int winner = r.nextInt(nonWinners.size());
         String winnerAccountRS = nonWinners.get(winner).getString("recipientRS");
         context.logInfoMessage(String.format("winner account is %s", winnerAccountRS));
         SetAccountPropertyCall setAccountPropertyCall = SetAccountPropertyCall.create(2).
-                recipient(winnerAccountRS).property(propertyKey).
+                recipient(winnerAccountRS).property(property).
                 value("winner:" + context.getBlock().getHeight());
-        context.createTransaction(setAccountPropertyCall);
+        return context.createTransaction(setAccountPropertyCall);
     }
 
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -143,7 +143,7 @@ class MessageHandler implements Runnable {
                     }
                 } catch (NetworkProtocolException exc) {
                     Logger.logDebugMessage("Unable to process message from " + peer.getHost() + ": " + exc.getMessage());
-                    peer.disconnectPeer();
+                    peer.blacklist(exc);
                 } catch (Exception exc) {
                     String errorMessage = (Peers.hideErrorDetails ? exc.getClass().getName() :
                             (exc.getMessage() != null ? exc.getMessage() : exc.toString()));

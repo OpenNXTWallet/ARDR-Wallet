@@ -1,23 +1,28 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package com.jelurida.ardor.contracts;
 
-import nxt.Nxt;
 import nxt.addons.JO;
-import nxt.blockchain.Block;
-import nxt.blockchain.ChainTransactionId;
-import nxt.blockchain.ChildTransaction;
-import nxt.blockchain.FxtTransaction;
-import nxt.util.Convert;
-import org.junit.Assert;
 import org.junit.Test;
-
-import static nxt.blockchain.ChildChain.IGNIS;
 
 public class HelloWorldTest extends AbstractContractTest {
 
     @Test
     public void helloWorld() {
-        String contractName = HelloWorld.class.getSimpleName();
-        ContractTestHelper.deployContract(contractName);
+        String contractName = ContractTestHelper.deployContract(HelloWorld.class);
 
         // Send message to trigger the contract execution
         JO messageJson = new JO();
@@ -28,21 +33,9 @@ public class HelloWorldTest extends AbstractContractTest {
         generateBlock();
 
         // Verify that the contract send back a message
-        Block lastBlock = Nxt.getBlockchain().getLastBlock();
-        ChainTransactionId contractResultTransactionId = null;
-        for (FxtTransaction transaction : lastBlock.getFxtTransactions()) {
-            for (ChildTransaction childTransaction : transaction.getSortedChildTransactions()) {
-                Assert.assertEquals(2, childTransaction.getChain().getId());
-                Assert.assertEquals(1, childTransaction.getType().getType());
-                Assert.assertEquals(0, childTransaction.getType().getSubtype());
-                Assert.assertEquals(ALICE.getAccount().getId(), childTransaction.getSenderId());
-                Assert.assertEquals(BOB.getAccount().getId(), childTransaction.getRecipientId());
-                ChainTransactionId triggerTransactionId = new ChainTransactionId(IGNIS.getId(), Convert.parseHexString(triggerFullHash));
-                Assert.assertEquals(triggerTransactionId, childTransaction.getReferencedTransactionId());
-                contractResultTransactionId = new ChainTransactionId(childTransaction.getChain().getId(), childTransaction.getFullHash());
-            }
-        }
-        Assert.assertNotNull(contractResultTransactionId);
+        testAndGetLastChildTransaction(2, 1, 0,
+                a -> true, 4000000L,
+                ALICE, BOB, triggerFullHash);
     }
 
 }

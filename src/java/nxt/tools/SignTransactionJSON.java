@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -22,6 +22,7 @@ import nxt.crypto.Crypto;
 import nxt.util.Convert;
 import nxt.util.JSON;
 import nxt.util.Logger;
+import nxt.util.security.BlockchainPermission;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 
@@ -36,6 +37,11 @@ import java.io.InputStreamReader;
 public final class SignTransactionJSON {
 
     public static void main(String[] args) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("tools"));
+        }
+
         try {
             Logger.setLevel(Logger.Level.ERROR);
             if (args.length == 0 || args.length > 2) {

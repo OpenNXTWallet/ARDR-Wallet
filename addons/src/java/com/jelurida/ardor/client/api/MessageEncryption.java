@@ -1,3 +1,18 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package com.jelurida.ardor.client.api;
 
 import nxt.Nxt;
@@ -10,7 +25,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 
 /**
- * Encrypt a message locally, then send the encrypted data to a remote node
+ * Sample Java program to encrypt a message locally, then send the encrypted data to a remote node without exposing the passphrase
  */
 public class MessageEncryption {
 
@@ -18,9 +33,9 @@ public class MessageEncryption {
 
     public static void main(String[] args) throws MalformedURLException {
         URL url = new URL("https://testardor.jelurida.com/nxt");
-        Nxt.init(Setup.COMMAND_LINE_TOOL);
 
-        // start the node, so make sure it is not already running or you'll receive a BindException
+        // starts the local node, so make sure it is not already running or you'll receive a BindException
+        Nxt.init(Setup.COMMAND_LINE_TOOL);
         try {
             MessageEncryption messageEncryption = new MessageEncryption();
             JO encryptedData = messageEncryption.encrypt();

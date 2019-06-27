@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -18,11 +18,16 @@ package nxt.dbschema;
 
 import nxt.Constants;
 import nxt.Nxt;
+import nxt.ae.AssetFreezeMonitor;
 import nxt.blockchain.BlockDb;
 import nxt.blockchain.BlockchainProcessorImpl;
+import nxt.blockchain.ChildChain;
+import nxt.blockchain.ChildChainLoader;
 import nxt.db.BasicDb;
 import nxt.db.DbVersion;
 import nxt.db.FullTextTrigger;
+import nxt.db.TransactionalDb;
+import nxt.util.Convert;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -52,7 +57,7 @@ public class FxtDbVersion extends DbVersion {
                 apply("CREATE TABLE IF NOT EXISTS transaction_fxt (db_id IDENTITY, id BIGINT NOT NULL, "
                         + "deadline SMALLINT NOT NULL, recipient_id BIGINT, transaction_index SMALLINT NOT NULL, "
                         + "amount BIGINT NOT NULL, fee BIGINT NOT NULL, full_hash BINARY(32) NOT NULL, "
-                        + "height INT NOT NULL, block_id BIGINT NOT NULL, FOREIGN KEY (block_id) REFERENCES block (id) ON DELETE CASCADE, "
+                        + "height INT NOT NULL, block_id BIGINT NOT NULL, "
                         + "signature BINARY(64) NOT NULL, timestamp INT NOT NULL, type TINYINT NOT NULL, subtype TINYINT NOT NULL, "
                         + "sender_id BIGINT NOT NULL, block_timestamp INT NOT NULL, has_prunable_attachment BOOLEAN NOT NULL DEFAULT FALSE, "
                         + "has_prunable_message BOOLEAN NOT NULL DEFAULT FALSE, has_prunable_encrypted_message BOOLEAN NOT NULL DEFAULT FALSE, "
@@ -450,6 +455,114 @@ public class FxtDbVersion extends DbVersion {
                 }
                 apply(null);
             case 146:
+                apply("CREATE TABLE IF NOT EXISTS asset_property (" +
+                        "   db_id IDENTITY, " +
+                        "   id BIGINT NOT NULL, " +
+                        "   asset_id BIGINT NOT NULL, " +
+                        "   setter_id BIGINT NOT NULL, " +
+                        "   property VARCHAR NOT NULL, " +
+                        "   value VARCHAR, " +
+                        "   height INT NOT NULL, " +
+                        "   latest BOOLEAN NOT NULL DEFAULT TRUE)");
+            case 147:
+                apply("CREATE UNIQUE INDEX IF NOT EXISTS asset_property_id_height_idx ON asset_property (id, height DESC)");
+            case 148:
+                apply("CREATE INDEX IF NOT EXISTS asset_property_height_id_idx ON asset_property (height, id)");
+            case 149:
+                apply("CREATE INDEX IF NOT EXISTS asset_property_asset_height_idx ON asset_property (asset_id, height DESC)");
+            case 150:
+                apply("CREATE INDEX IF NOT EXISTS asset_property_setter_property_idx ON asset_property (setter_id, property)");
+            case 151:
+                apply("CREATE TABLE IF NOT EXISTS holding_freeze (" +
+                        "   db_id IDENTITY, " +
+                        "   holding_id BIGINT NOT NULL, " +
+                        "   holding_type VARCHAR NOT NULL CHECK (holding_type IN ('ASSET', 'CURRENCY')), " +
+                        "   min_height INT NOT NULL, " +
+                        "   actual_height INT NOT NULL, " +
+                        "   height INT NOT NULL, " +
+                        "   latest BOOLEAN NOT NULL DEFAULT TRUE)");
+            case 152:
+                apply("CREATE UNIQUE INDEX IF NOT EXISTS holding_freeze_holding_id_holding_type_idx ON holding_freeze (holding_id, holding_type, height DESC)");
+            case 153:
+                apply("CREATE INDEX IF NOT EXISTS holding_freeze_actual_height_idx ON holding_freeze (actual_height)");
+            case 154:
+                apply("CREATE INDEX IF NOT EXISTS holding_freeze_height_idx ON holding_freeze (height)");
+            case 155:
+                apply("CREATE TABLE IF NOT EXISTS holding_migrate (" +
+                        "   db_id IDENTITY, " +
+                        "   holding_id BIGINT, " +
+                        "   holding_type VARCHAR NOT NULL CHECK (holding_type IN ('ASSET', 'CURRENCY', 'COIN')), " +
+                        "   child_chain_id INT NOT NULL, " +
+                        "   min_height INT NOT NULL, " +
+                        "   actual_height INT NOT NULL, " +
+                        "   height INT NOT NULL, " +
+                        "   latest BOOLEAN NOT NULL DEFAULT TRUE)");
+            case 156:
+                apply("CREATE UNIQUE INDEX IF NOT EXISTS holding_migrate_child_chain_id_idx ON holding_migrate (child_chain_id, height DESC)");
+            case 157:
+                apply("CREATE INDEX IF NOT EXISTS holding_migrate_holding_id_holding_type_idx ON holding_migrate (holding_id, holding_type)");
+            case 158:
+                apply("CREATE INDEX IF NOT EXISTS holding_migrate_actual_height_idx ON holding_migrate (actual_height)");
+            case 159:
+                apply("CREATE INDEX IF NOT EXISTS holding_migrate_height_idx ON holding_migrate (height)");
+            case 160:
+                TransactionalDb.runInDbTransaction(() -> {
+                    if (Constants.isTestnet) {
+                        ChildChainLoader.enableChildChainLoading(ChildChain.MPG, Constants.MPG_BLOCK, 0);
+                    }
+                    apply(null);
+                });
+            case 161:
+                apply("CREATE TABLE IF NOT EXISTS phasing_poll_hashed_secret (db_id IDENTITY, hashed_secret VARBINARY NOT NULL," +
+                        "hashed_secret_id BIGINT NOT NULL, algorithm TINYINT NOT NULL, " +
+                        "transaction_full_hash BINARY(32), transaction_id BIGINT NOT NULL, chain_id INT NOT NULL, " +
+                        "finish_height INT NOT NULL, height INT NOT NULL)");
+            case 162:
+                apply("CREATE INDEX IF NOT EXISTS phasing_poll_hashed_secret_id_ix ON phasing_poll_hashed_secret (hashed_secret_id)");
+            case 163:
+                apply("CREATE INDEX IF NOT EXISTS phasing_poll_hashed_secret_transaction_id_idx ON phasing_poll_hashed_secret (transaction_id)");
+            case 164:
+                apply("CREATE INDEX IF NOT EXISTS phasing_poll_hashed_secret_height_idx ON phasing_poll_hashed_secret (height)");
+            case 165:
+                TransactionalDb.runInDbTransaction(() -> {
+                    if (!Constants.isTestnet) {
+                        ChildChainLoader.enableChildChainLoading(ChildChain.MPG, Constants.MPG_BLOCK, Constants.MPG_BLOCK);
+                    }
+                    apply(null);
+                });
+            case 166:
+                TransactionalDb.runInDbTransaction(() -> {
+                    if (!Constants.isTestnet) {
+                        //schedule freeze of C2C asset
+                        AssetFreezeMonitor.enableFreeze(Convert.parseUnsignedLong("6066975351926729052"), Constants.MPG_BLOCK, Constants.MPG_BLOCK);
+                    }
+                    apply(null);
+                });
+            case 167:
+                try (Connection con = db.getConnection(schema);
+                     Statement stmt = con.createStatement();
+                     ResultSet rs = stmt.executeQuery("SELECT CONSTRAINT_NAME, TABLE_NAME FROM INFORMATION_SCHEMA.CONSTRAINTS "
+                             + "WHERE TABLE_SCHEMA='" + schema + "' AND TABLE_NAME IN ('TRANSACTION_FXT') AND COLUMN_LIST='BLOCK_ID'")) {
+                    List<String> tables = new ArrayList<>();
+                    List<String> constraints = new ArrayList<>();
+                    while (rs.next()) {
+                        tables.add(rs.getString("TABLE_NAME"));
+                        constraints.add(rs.getString("CONSTRAINT_NAME"));
+                    }
+                    for (int i = 0; i < tables.size(); i++) {
+                        stmt.executeUpdate("ALTER TABLE " + tables.get(i) + " DROP CONSTRAINT " + constraints.get(i));
+                    }
+                    apply(null);
+                } catch (SQLException e) {
+                    throw new RuntimeException(e.toString(), e);
+                }
+            case 168:
+                apply("CREATE INDEX IF NOT EXISTS transaction_fxt_block_id_idx ON transaction_fxt (block_id)");
+            case 169:
+                apply("UPDATE holding_freeze SET height = -1");
+            case 170:
+                apply("UPDATE holding_migrate SET height = -1");
+            case 171:
                 return;
             default:
                 throw new RuntimeException("Forging chain database inconsistent with code, at update " + nextUpdate

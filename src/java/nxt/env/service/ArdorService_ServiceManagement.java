@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -18,6 +18,7 @@ package nxt.env.service;
 
 import nxt.Nxt;
 import nxt.env.LookAndFeel;
+import nxt.util.security.BlockchainPermission;
 
 import javax.swing.*;
 
@@ -25,6 +26,10 @@ import javax.swing.*;
 public class ArdorService_ServiceManagement {
 
     public static boolean serviceInit() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("windowsService"));
+        }
         LookAndFeel.init();
         new Thread(() -> {
             String[] args = {};
@@ -35,9 +40,13 @@ public class ArdorService_ServiceManagement {
 
     // Invoked when registering the service
     public static String[] serviceGetInfo() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("windowsService"));
+        }
         return new String[]{
                 "Ardor Server", // Long name
-                "Manages the Ardor cryptographic currency protocol", // Description
+                "Manages the Ardor Blockchain Protocol", // Description
                 "true", // IsAutomatic
                 "true", // IsAcceptStop
                 "", // failure exe
@@ -52,14 +61,26 @@ public class ArdorService_ServiceManagement {
     }
 
     public static boolean serviceIsCreate() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("windowsService"));
+        }
         return JOptionPane.showConfirmDialog(null, "Do you want to install the Ardor service ?", "Create Service", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION;
     }
 
     public static boolean serviceIsLaunch() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("windowsService"));
+        }
         return true;
     }
 
     public static boolean serviceIsDelete() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("windowsService"));
+        }
         return JOptionPane.showConfirmDialog(null, "This Ardor service is already installed. Do you want to delete it ?", "Delete Service", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION;
     }
 

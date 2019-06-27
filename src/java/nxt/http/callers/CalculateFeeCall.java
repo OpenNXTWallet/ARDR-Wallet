@@ -1,7 +1,6 @@
 // Auto generated code, do not modify
 package nxt.http.callers;
 
-import java.lang.String;
 import nxt.http.APICall;
 
 public class CalculateFeeCall extends APICall.Builder<CalculateFeeCall> {
@@ -15,6 +14,14 @@ public class CalculateFeeCall extends APICall.Builder<CalculateFeeCall> {
 
     public CalculateFeeCall transactionJSON(String transactionJSON) {
         return param("transactionJSON", transactionJSON);
+    }
+
+    public CalculateFeeCall minBundlerFeeLimitFQT(long minBundlerFeeLimitFQT) {
+        return param("minBundlerFeeLimitFQT", minBundlerFeeLimitFQT);
+    }
+
+    public CalculateFeeCall minBundlerBalanceFXT(long minBundlerBalanceFXT) {
+        return param("minBundlerBalanceFXT", minBundlerBalanceFXT);
     }
 
     public CalculateFeeCall transactionBytes(String transactionBytes) {

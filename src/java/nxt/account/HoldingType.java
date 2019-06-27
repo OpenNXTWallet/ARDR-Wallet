@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -19,6 +19,7 @@ package nxt.account;
 import nxt.ae.Asset;
 import nxt.blockchain.Chain;
 import nxt.ms.Currency;
+import nxt.util.security.BlockchainPermission;
 
 public enum HoldingType {
 
@@ -125,6 +126,10 @@ public enum HoldingType {
     };
 
     public static HoldingType get(byte code) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("holding"));
+        }
         for (HoldingType holdingType : values()) {
             if (holdingType.getCode() == code) {
                 return holdingType;

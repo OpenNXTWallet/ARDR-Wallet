@@ -1,9 +1,29 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package nxt.addons;
 
 import org.json.simple.JSONArray;
+import org.json.simple.JSONValue;
+import org.json.simple.parser.ParseException;
 
+import java.io.IOException;
+import java.io.Reader;
 import java.util.AbstractList;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
@@ -23,11 +43,17 @@ public class JA extends AbstractList {
     }
 
     public JA(JSONArray ja) {
+        if (ja == null) {
+            throw new IllegalArgumentException("Attempt to initialize JA with null JSONArray");
+        }
         this.ja = ja;
     }
 
-    public JA(Object ja) {
-        this.ja = (JSONArray)ja;
+    public JA(Object obj) {
+        if (obj == null) {
+            throw new IllegalArgumentException("Attempt to initialize JA with null Object");
+        }
+        this.ja = (JSONArray)obj;
     }
 
     public JSONArray toJSONArray() {
@@ -54,8 +80,8 @@ public class JA extends AbstractList {
         return lo.stream().map(e -> e instanceof JO ? (JO)e : new JO(e)).collect(Collectors.toList());
     }
 
-    public void add(JO jo) {
-        ja.add(jo.toJSONObject());
+    public boolean add(JO jo) {
+        return ja.add(jo.toJSONObject());
     }
 
     public JO get(int i) {
@@ -73,5 +99,29 @@ public class JA extends AbstractList {
     @Override
     public ListIterator listIterator() {
         return ja.listIterator();
+    }
+
+    public static JA parse(String s) {
+        try {
+            return new JA(JSONValue.parseWithException(s));
+        } catch (ParseException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
+    public static JA parse(Reader r) {
+        try {
+            return new JA(JSONValue.parseWithException(r));
+        } catch (ParseException | IOException e) {
+            throw new IllegalArgumentException(e);
+        }
+    }
+
+    public boolean addAllJO(Collection<JO> c) {
+        boolean modified = false;
+        for (JO e : c)
+            if (add(e))
+                modified = true;
+        return modified;
     }
 }

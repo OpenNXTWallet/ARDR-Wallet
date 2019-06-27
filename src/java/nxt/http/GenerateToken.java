@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -18,12 +18,12 @@ package nxt.http;
 
 import nxt.account.Token;
 import nxt.util.Convert;
+import nxt.util.JSON;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONStreamAware;
 
 import javax.servlet.http.HttpServletRequest;
 
-import static nxt.http.JSONResponses.INCORRECT_WEBSITE;
 import static nxt.http.JSONResponses.MISSING_WEBSITE;
 
 
@@ -54,7 +54,10 @@ public final class GenerateToken extends APIServlet.APIRequestHandler {
             return response;
 
         } catch (RuntimeException e) {
-            return INCORRECT_WEBSITE;
+            JSONObject response = new JSONObject();
+            response.put("errorCode", 4);
+            response.put("errorDescription", e.toString());
+            return JSON.prepare(response);
         }
 
     }
@@ -77,6 +80,11 @@ public final class GenerateToken extends APIServlet.APIRequestHandler {
     @Override
     protected boolean isChainSpecific() {
         return false;
+    }
+
+    @Override
+    protected boolean isTextArea(String parameter) {
+        return "website".equals(parameter);
     }
 
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -184,6 +184,7 @@ public final class OrderHome {
             this.quantityQNT = quantityQNT;
         }
 
+        public abstract void cancelOrder(AccountLedger.LedgerEventId eventId);
     }
 
     public int getAskCount() {
@@ -284,6 +285,12 @@ public final class OrderHome {
             }
         }
 
+        @Override
+        public void cancelOrder(AccountLedger.LedgerEventId eventId) {
+            this.getChildChain().getOrderHome().removeAskOrder(getId());
+            Account.getAccount(getAccountId())
+                    .addToUnconfirmedAssetBalanceQNT(LedgerEvent.ASSET_ASK_ORDER_CANCELLATION, eventId, getAssetId(), getQuantityQNT());
+        }
     }
 
     public int getBidCount() {
@@ -399,6 +406,14 @@ public final class OrderHome {
                 throw new IllegalArgumentException("Negative quantity: " + quantityQNT
                         + " for order: " + Long.toUnsignedString(getId()));
             }
+        }
+
+        @Override
+        public void cancelOrder(AccountLedger.LedgerEventId eventId) {
+            ChildChain chain = getChildChain();
+            chain.getOrderHome().removeBidOrder(getId());
+            Account.getAccount(getAccountId())
+                    .addToUnconfirmedBalance(chain, LedgerEvent.ASSET_BID_ORDER_CANCELLATION, eventId, getAmountNQT());
         }
     }
 

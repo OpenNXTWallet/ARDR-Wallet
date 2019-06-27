@@ -1,7 +1,6 @@
 // Auto generated code, do not modify
 package nxt.http.callers;
 
-import java.lang.String;
 import nxt.http.APICall;
 
 public class DownloadTaggedDataCall extends APICall.Builder<DownloadTaggedDataCall> {
@@ -10,24 +9,14 @@ public class DownloadTaggedDataCall extends APICall.Builder<DownloadTaggedDataCa
     }
 
     public static DownloadTaggedDataCall create(int chain) {
-        DownloadTaggedDataCall instance = new DownloadTaggedDataCall();
-        instance.param("chain", chain);
-        return instance;
+        return new DownloadTaggedDataCall().param("chain", chain);
     }
 
     public DownloadTaggedDataCall requireLastBlock(String requireLastBlock) {
         return param("requireLastBlock", requireLastBlock);
     }
 
-    public DownloadTaggedDataCall chain(String chain) {
-        return param("chain", chain);
-    }
-
-    public DownloadTaggedDataCall chain(int chain) {
-        return param("chain", chain);
-    }
-
-    public DownloadTaggedDataCall retrieve(String retrieve) {
+    public DownloadTaggedDataCall retrieve(boolean retrieve) {
         return param("retrieve", retrieve);
     }
 

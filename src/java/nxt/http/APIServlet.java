@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -25,6 +25,7 @@ import nxt.blockchain.ChildChain;
 import nxt.dbschema.Db;
 import nxt.util.JSON;
 import nxt.util.Logger;
+import nxt.util.security.BlockchainPermission;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONStreamAware;
 
@@ -76,6 +77,12 @@ public final class APIServlet extends HttpServlet {
             if (allowRequiredBlockParameters()) {
                 parameters.add("requireBlock");
                 parameters.add("requireLastBlock");
+            }
+            if (parameters.contains("secretPhrase") && ! (this instanceof CreateTransaction) && ! (this instanceof SplitSecret)) {
+                parameters.add("sharedPieceAccount");
+                parameters.add("sharedPiece");
+                parameters.add("sharedPiece");
+                parameters.add("sharedPiece");
             }
             this.parameters = Collections.unmodifiableList(parameters);
             this.apiTags = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(apiTags)));
@@ -208,10 +215,18 @@ public final class APIServlet extends HttpServlet {
     }
 
     public static APIRequestHandler getAPIRequestHandler(String requestType) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("api"));
+        }
         return apiRequestHandlers.get(requestType);
     }
 
     public static Map<String, APIRequestHandler> getAPIRequestHandlers() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("api"));
+        }
         return apiRequestHandlers;
     }
 
@@ -243,7 +258,7 @@ public final class APIServlet extends HttpServlet {
 
         try {
 
-            if (!API.isAllowed(req.getRemoteHost())) {
+            if (API.isForbiddenHost(req.getRemoteHost())) {
                 response = ERROR_NOT_ALLOWED;
                 return;
             }

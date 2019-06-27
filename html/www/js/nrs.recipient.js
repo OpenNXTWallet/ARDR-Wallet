@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2018 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2019 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -41,15 +41,53 @@ var NRS = (function(NRS, $) {
 
 		$recipientFields.on("oldRecipientPaste", function() {
 			var modal = $(this).closest(".modal");
-
 			var callout = modal.find(".account_info").first();
-
 			callout.removeClass("callout-info callout-danger callout-warning").addClass("callout-danger").html($.t("error_numeric_ids_not_allowed")).show();
 		});
+
+		$(".recipient_contract_reference_selector").find("select").on("change", function() {
+			if (!$currentModal) {
+				return;
+			}
+			var contractName = $currentModal.find(".recipient_contract_reference_selector").find("select").val();
+            var $messageInput = $currentModal.find("textarea[name=message]");
+			var $permanentMessageCheckbox = $currentModal.find("input[name=permanent_message]");
+			var $addMessageCheckbox = $currentModal.find("input[name=add_message]");
+
+			if (contractName == "") {
+                $messageInput.val("");
+				$permanentMessageCheckbox.prop("disabled", false);
+                $addMessageCheckbox.prop("checked", false);
+                $addMessageCheckbox.trigger("change");
+				return;
+			}
+			var account = $currentModal.find("input[name=converted_account_id]").val();
+			if (account === "") {
+				account = $currentModal.find("input[name=recipient]").val();
+			}
+			NRS.sendRequest("getContractReferences", { account: account, contractName: contractName, includeContract: true }, function(response) {
+				if (!response.contractReferences || response.contractReferences.length != 1) {
+                    $messageInput.val("");
+					$permanentMessageCheckbox.prop("disabled", false);
+                    $addMessageCheckbox.prop("checked", false);
+                    $addMessageCheckbox.trigger("change");
+					return;
+				}
+				var contract = response.contractReferences[0].contract;
+				var paramsTemplate = NRS.getInvocationParamsTemplate(contractName, contract.supportedInvocationParams);
+                $messageInput.val(JSON.stringify(paramsTemplate, null, 2));
+				$permanentMessageCheckbox.prop("checked", false);
+				$permanentMessageCheckbox.prop("disabled", true);
+                $addMessageCheckbox.prop("checked", true);
+                $addMessageCheckbox.trigger("change");
+			});
+		})
 	};
 
-	$("#send_message_modal, #send_money_modal, #transfer_currency_modal, #add_contact_modal, #set_account_property_modal, #delete_account_property_modal").on("show.bs.modal", function(e) {
+	var $currentModal;
+	$(".has-recipient").on("show.bs.modal", function(e) {
 		var $invoker = $(e.relatedTarget);
+		$currentModal = $(this);
 		var account = $invoker.data("account");
 		if (!account) {
 			account = $invoker.data("contact");
@@ -64,38 +102,43 @@ var NRS = (function(NRS, $) {
 	});
 
 	//todo later: http://twitter.github.io/typeahead.js/
-	var modal = $(".modal");
-    modal.on("click", "span.recipient_selector button, span.plain_address_selector button", function(e) {
-		if (!Object.keys(NRS.contacts).length) {
+	var $allModals = $(".modal");
+    $allModals.on("click", "span.recipient_selector button, span.plain_address_selector button", function(e) {
+		if (!Object.keys(NRS.contacts).length && !NRS.getStrItem("savedNxtAccounts")) {
 			e.preventDefault();
 			e.stopPropagation();
 			return;
 		}
-
 		var $list = $(this).parent().find("ul");
-
 		$list.empty();
-
 		for (var accountId in NRS.contacts) {
 			if (!NRS.contacts.hasOwnProperty(accountId)) {
 				continue;
 			}
 			$list.append("<li><a href='#' data-contact-id='" + accountId + "' data-contact='" + String(NRS.contacts[accountId].name).escapeHTML() + "'>" + String(NRS.contacts[accountId].name).escapeHTML() + "</a></li>");
 		}
+        var accounts = NRS.getStrItem("savedNxtAccounts").split(";");
+        for (var index in accounts) {
+        	var account = accounts[index];
+        	if (account === "" || NRS.contacts[account]) {
+        		continue;
+			}
+            $list.append("<li><a href='#' data-contact-id='" + account + "' data-contact='" + account + "'>" + account + "</a></li>");
+        }
 	});
 
-	modal.on("click", "span.recipient_selector ul li a", function(e) {
+	$allModals.on("click", "span.recipient_selector ul li a", function(e) {
 		e.preventDefault();
 		$(this).closest("form").find("input[name=converted_account_id]").val("");
 		$(this).closest("form").find("input[name=recipient],input[name=account_id]").not("[type=hidden]").trigger("unmask").val($(this).data("contact")).trigger("blur");
 	});
 
-	modal.on("click", "span.plain_address_selector ul li a", function(e) {
+	$allModals.on("click", "span.plain_address_selector ul li a", function(e) {
 		e.preventDefault();
 		$(this).closest(".input-group").find("input.plain_address_selector_input").not("[type=hidden]").trigger("unmask").val($(this).data("contact-id")).trigger("blur");
 	});
 
-	modal.on("keyup blur show", ".plain_address_selector_input", function() {
+	$allModals.on("keyup blur show", ".plain_address_selector_input", function() {
 		var currentValue = $(this).val();
 		var contactInfo;
 		if (NRS.contacts[currentValue]) {
@@ -118,7 +161,7 @@ var NRS = (function(NRS, $) {
 		}
 	};
 
-	NRS.getAccountError = function(accountId, callback) {
+	NRS.checkAccountStatus = function(accountId, callback) {
 		NRS.sendRequest("getAccount", {
 			"account": accountId
 		}, function(response) {
@@ -126,10 +169,10 @@ var NRS = (function(NRS, $) {
                 "account": accountId,
                 "chain": NRS.getActiveChainId()
             }, function (balance) {
-                var result;
+                var status;
                 if (response.publicKey) {
                     if (response.name) {
-                        result = {
+                        status = {
                             "type": "info",
                             "message": $.t("recipient_info_with_name", {
                                 "name": NRS.unescapeRespStr(response.name),
@@ -138,9 +181,8 @@ var NRS = (function(NRS, $) {
                             }),
                             "account": response
                         };
-                    }
-                    else {
-                        result = {
+                    } else {
+                        status = {
                             "type": "info",
                             "message": $.t("recipient_info", {
                                 "nxt": NRS.formatAmount(balance.unconfirmedBalanceNQT, false, true),
@@ -152,27 +194,27 @@ var NRS = (function(NRS, $) {
                 } else {
                     if (response.errorCode) {
                         if (response.errorCode == 4) {
-                            result = {
+                            status = {
                                 "type": "danger",
                                 "message": $.t("recipient_malformed") + (!NRS.isRsAccount(accountId) ? " " + $.t("recipient_alias_suggestion") : ""),
                                 "account": null
                             };
                         } else if (response.errorCode == 5) {
-                            result = {
+                            status = {
                                 "type": "warning",
                                 "message": $.t("recipient_unknown_pka"),
                                 "account": null,
                                 "noPublicKey": true
                             };
                         } else {
-                            result = {
+                            status = {
                                 "type": "danger",
                                 "message": $.t("recipient_problem") + " " + NRS.unescapeRespStr(response.errorDescription),
                                 "account": null
                             };
                         }
                     } else {
-                        result = {
+                        status = {
                             "type": "warning",
                             "message": $.t("recipient_no_public_key_pka", {
                                 "nxt": NRS.formatAmount(balance.unconfirmedBalanceNQT, false, true),
@@ -183,8 +225,8 @@ var NRS = (function(NRS, $) {
                         };
                     }
                 }
-                result.message = result.message.escapeHTML();
-                callback(result);
+                status.message = status.message.escapeHTML();
+                callback(status);
             });
         });
 	};
@@ -193,9 +235,17 @@ var NRS = (function(NRS, $) {
 		$(el).closest(".modal-body").find("input[name=recipient],input[name=account_id]").val($(el).data("address")).trigger("blur");
 	};
 
+	function displayPublicKey(response, account, modal) {
+		if (response.noPublicKey && account != NRS.accountRS) {
+			modal.find(".recipient_public_key").show();
+		} else {
+			modal.find("input[name=recipientPublicKey]").val("");
+			modal.find(".recipient_public_key").hide();
+		}
+	}
+
 	NRS.checkRecipient = function(account, modal) {
 		var classes = "callout-info callout-danger callout-warning";
-
 		var callout = modal.find(".account_info").first();
 		var accountInputField = modal.find("input[name=converted_account_id]");
 		var merchantInfoField = modal.find("input[name=merchant_info]");
@@ -203,26 +253,18 @@ var NRS = (function(NRS, $) {
 		accountInputField.val("");
 		merchantInfoField.val("");
 		modal.find("input[name=encrypt_message]").attr('disabled', false);
-
 		account = $.trim(account);
 
-		//solomon reed. Btw, this regex can be shortened..
 		if (NRS.isRsAccount(account)) {
 			var address = new NxtAddress();
-
 			if (address.set(account)) {
-				NRS.getAccountError(account, function(response) {
-					if (response.noPublicKey && account!=NRS.accountRS) {
-						modal.find(".recipient_public_key").show();
-					} else {
-						modal.find("input[name=recipientPublicKey]").val("");
-						modal.find(".recipient_public_key").hide();
-					}
+				NRS.checkAccountStatus(account, function(response) {
+					displayPublicKey(response, account, modal);
+					loadContractReferences(account);
 					updateRecipientOptions(response, modal);
-					
-					if (account==NRS.accountRS)
+					if (account == NRS.accountRS) {
 						callout.removeClass(classes).addClass("callout-" + response.type).html("This is your account").show();
-					else{
+					} else {
 						callout.removeClass(classes).addClass("callout-" + response.type).html(response.message).show();
 					}
 				});
@@ -238,7 +280,6 @@ var NRS = (function(NRS, $) {
 					for (var i = 0; i < address.guess.length; i++) {
 						html += "<li><span class='malformed_address' data-address='" + NRS.escapeRespStr(address.guess[i]) + "' onclick='NRS.correctAddressMistake(this);'>" + address.format_guess(address.guess[i], account) + "</span></li>";
 					}
-
 					callout.removeClass(classes).addClass("callout-danger").html(html).show();
 				} else {
 					callout.removeClass(classes).addClass("callout-danger").html($.t("recipient_malformed")).show();
@@ -251,15 +292,10 @@ var NRS = (function(NRS, $) {
 				}], function(error, contact) {
 					if (!error && contact.length) {
 						contact = contact[0];
-						NRS.getAccountError(contact.accountRS, function(response) {
-							if (response.noPublicKey && account!=NRS.account) {
-								modal.find(".recipient_public_key").show();
-							} else {
-								modal.find("input[name=recipientPublicKey]").val("");
-								modal.find(".recipient_public_key").hide();
-							}
+						NRS.checkAccountStatus(contact.accountRS, function(response) {
+							displayPublicKey(response, contact.accountRS, modal);
+							loadContractReferences(contact.accountRS);
 							updateRecipientOptions(response, modal);
-
 							callout.removeClass(classes).addClass("callout-" + response.type).html($.t("contact_account_link", {
 								"account_id": NRS.getAccountFormatted(contact, "account")
 							}) + " " + response.message).show();
@@ -287,78 +323,71 @@ var NRS = (function(NRS, $) {
 		}
 	};
 
-	NRS.checkRecipientAlias = function(account, modal) {
+    NRS.getAccountAlias = function(alias) {
+        var result = {};
+        NRS.sendRequest("getAlias", {
+            "aliasName": alias,
+            "chain": 2 // always use Ignis
+        }, function(response) {
+            if (response.errorCode) {
+                result.error = response.errorDescription;
+                return
+            }
+            if (response.aliasURI) {
+                var aliasURI = String(response.aliasURI);
+                var regex_1 = /acct:(.*)@nxt/;
+                var regex_2 = /nacc:(.*)/;
+                var match = aliasURI.match(regex_1);
+                if (!match) {
+                    match = aliasURI.match(regex_2);
+                }
+                if (match && match[1]) {
+                    match[1] = String(match[1]).toUpperCase();
+                    if (/^\d+$/.test(match[1])) {
+                        var address = new NxtAddress();
+                        if (address.set(match[1])) {
+                            match[1] = address.toString();
+                        } else {
+                            result.error = $.t("error_invalid_account_id");
+                            return;
+                        }
+                    }
+                    result.id = match[1];
+                    result.timestamp = response.timestamp;
+                    return;
+                }
+            }
+            result.id = response.accountRS;
+			result.timestamp = response.timestamp;
+        }, { isAsync: false });
+        return result;
+    };
+
+	NRS.checkRecipientAlias = function(alias, modal) {
 		var classes = "callout-info callout-danger callout-warning";
 		var callout = modal.find(".account_info").first();
 		var accountInputField = modal.find("input[name=converted_account_id]");
-
 		accountInputField.val("");
+		var result = NRS.getAccountAlias(alias);
+		if (result.error) {
+            callout.removeClass(classes).addClass("callout-danger").html($.t("error_invalid_account_id")).show();
+            return;
+        }
+		var account = result.id;
+        NRS.checkAccountStatus(account, function(response) {
+            displayPublicKey(response, account, modal);
+            loadContractReferences(account);
+            updateRecipientOptions(response, modal);
+            callout.removeClass(classes).addClass("callout-" + response.type).html($.t("alias_account_link", {
+                "account_id": NRS.escapeRespStr(account)
+            }) + " " + response.message + " " + $.t("alias_last_adjusted", {
+                "timestamp": NRS.formatTimestamp(result.timestamp)
+            })).show();
 
-		NRS.sendRequest("getAlias", {
-			"aliasName": account
-		}, function(response) {
-			if (response.errorCode) {
-				callout.removeClass(classes).addClass("callout-danger").html($.t("error_invalid_account_id")).show();
-			} else {
-				if (response.aliasURI) {
-					var alias = String(response.aliasURI);
-					var timestamp = response.timestamp;
-
-					var regex_1 = /acct:(.*)@nxt/;
-					var regex_2 = /nacc:(.*)/;
-
-					var match = alias.match(regex_1);
-
-					if (!match) {
-						match = alias.match(regex_2);
-					}
-
-					if (match && match[1]) {
-						match[1] = String(match[1]).toUpperCase();
-
-						if (/^\d+$/.test(match[1])) {
-							var address = new NxtAddress();
-
-							if (address.set(match[1])) {
-								match[1] = address.toString();
-							} else {
-								accountInputField.val("");
-								callout.removeClass(classes).addClass("callout-danger").html($.t("error_invalid_account_id")).show();
-								return;
-							}
-						}
-
-						NRS.getAccountError(match[1], function(response) {
-							if (response.noPublicKey) {
-								modal.find(".recipient_public_key").show();
-							} else {
-								modal.find("input[name=recipientPublicKey]").val("");
-								modal.find(".recipient_public_key").hide();
-							}
-							updateRecipientOptions(response, modal);
-
-							callout.removeClass(classes).addClass("callout-" + response.type).html($.t("alias_account_link", {
-								"account_id": NRS.escapeRespStr(match[1])
-							}) + " " + response.message + " " + $.t("alias_last_adjusted", {
-								"timestamp": NRS.formatTimestamp(timestamp)
-							})).show();
-
-							if (response.type == "info" || response.type == "warning") {
-								accountInputField.val(NRS.escapeRespStr(match[1]));
-							}
-						});
-					} else {
-						callout.removeClass(classes).addClass("callout-danger").html($.t("alias_account_no_link") + (!alias ? $.t("error_uri_empty") : $.t("uri_is", {
-							"uri": NRS.escapeRespStr(alias)
-						}))).show();
-					}
-				} else if (response.aliasName) {
-					callout.removeClass(classes).addClass("callout-danger").html($.t("error_alias_empty_uri")).show();
-				} else {
-					callout.removeClass(classes).addClass("callout-danger").html(response.errorDescription ? $.t("error") + ": " + NRS.escapeRespStr(response.errorDescription) : $.t("error_alias")).show();
-				}
-			}
-		});
+            if (response.type == "info" || response.type == "warning") {
+                accountInputField.val(NRS.escapeRespStr(account));
+            }
+        });
 	};
 
     function updateRecipientOptions(accountResponse, modal) {
@@ -367,12 +396,12 @@ var NRS = (function(NRS, $) {
                 checkForMerchant(accountResponse.account.description, modal);
             }
             var params = {
-                        "setter": accountResponse.account.account,
-                        "recipient": accountResponse.account.account,
-                        "property": "nrs_recipient_ui_options"
-                    };
+				"setter": accountResponse.account.account,
+				"recipient": accountResponse.account.account,
+				"property": "nrs_recipient_ui_options"
+			};
             NRS.sendRequest("getAccountProperties", params,
-                function (response) {
+		function (response) {
                     var options = {};
                     if ($.isArray(response.properties) && response.properties.length > 0) {
                         try {
@@ -392,9 +421,48 @@ var NRS = (function(NRS, $) {
                     if (options.encrypt_message_disabled === true) {
                         encryptMessageCheckbox.attr('disabled', true);
                     }
-                });
-        }
+                }
+			);
+		}
     }
+
+    function loadContractReferences(account) {
+    	if (!$currentModal) {
+    		return;
+		}
+		NRS.sendRequest("getContractReferences", { account: account, includeContract: true }, function(response) {
+			var $recipientContractReferenceSelector = $currentModal.find(".recipient_contract_reference_selector");
+			if (!response.contractReferences || response.contractReferences.length == 0) {
+				if ($recipientContractReferenceSelector.is(":visible")) {
+                    var $messageInput = $currentModal.find("textarea[name=message]");
+                    $messageInput.val("");
+					var $permanentMessageCheckbox = $currentModal.find("input[name=permanent_message]");
+					$permanentMessageCheckbox.prop("disabled", false);
+                    var $addMessageCheckbox = $currentModal.find("input[name=add_message]");
+                    $addMessageCheckbox.prop("checked", false);
+                    $addMessageCheckbox.trigger("change");
+				}
+				$recipientContractReferenceSelector.hide();
+				return;
+			}
+			$recipientContractReferenceSelector.show();
+			var $contractsSelector = $recipientContractReferenceSelector.find("select");
+			$contractsSelector.empty();
+			$contractsSelector.append("<option value='' selected>" + $.t("select_contract_to_trigger") + " </option>");
+			for (var key in response.contractReferences) {
+				if (response.contractReferences.hasOwnProperty(key)) {
+					var name = response.contractReferences[key].name;
+					var contract = response.contractReferences[key].contract;
+					for (var i=0; i < contract.invocationTypes.length; i++) {
+						if (contract.invocationTypes[i].type == "TRANSACTION" || contract.invocationTypes[i].type == "VOUCHER") {
+							$contractsSelector.append("<option value='" + name + "'>" + name + "</option>");
+							break;
+						}
+					}
+				}
+			}
+		});
+	}
 
 	function checkForMerchant(accountInfo, modal) {
 		var requestType = modal.find("input[name=request_type]").val(); // only works for single request type per modal

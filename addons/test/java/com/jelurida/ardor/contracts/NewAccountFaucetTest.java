@@ -1,3 +1,18 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package com.jelurida.ardor.contracts;
 
 import nxt.Tester;
@@ -20,7 +35,7 @@ public class NewAccountFaucetTest extends AbstractContractTest {
         setupParams.put("thresholdBlocks", 10);
         setupParams.put("faucetAmountNQT", 500000000);
         String contractName = NewAccountFaucet.class.getSimpleName();
-        ContractTestHelper.deployContract(NewAccountFaucet.class.getSimpleName(), setupParams);
+        ContractTestHelper.deployContract(NewAccountFaucet.class, setupParams);
         generateBlock();
         Tester newGuy = new Tester("rule chase pound passion whistle odd tumble joy howl reason crack turn");
         // newGuy generates a voucher
@@ -60,7 +75,7 @@ public class NewAccountFaucetTest extends AbstractContractTest {
         setupParams.put("thresholdBlocks", 10);
         setupParams.put("faucetAmountNQT", 500000000);
         String contractName = NewAccountFaucet.class.getSimpleName();
-        ContractTestHelper.deployContract(NewAccountFaucet.class.getSimpleName(), setupParams);
+        ContractTestHelper.deployContract(NewAccountFaucet.class, setupParams);
 
         // BOB generates a voucher
         JO response = getVoucher(BOB);
@@ -85,7 +100,7 @@ public class NewAccountFaucetTest extends AbstractContractTest {
         setupParams.put("thresholdBlocks", 10);
         setupParams.put("faucetAmountNQT", 500000000);
         String contractName = NewAccountFaucet.class.getSimpleName();
-        ContractTestHelper.deployContract(NewAccountFaucet.class.getSimpleName(), setupParams);
+        ContractTestHelper.deployContract(NewAccountFaucet.class, setupParams);
         generateBlock();
 
         // contracts.json sets threshold of 11 IGNIS over 1440 blocks

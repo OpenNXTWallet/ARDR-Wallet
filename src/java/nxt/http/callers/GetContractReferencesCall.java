@@ -1,7 +1,6 @@
 // Auto generated code, do not modify
 package nxt.http.callers;
 
-import java.lang.String;
 import nxt.http.APICall;
 
 public class GetContractReferencesCall extends APICall.Builder<GetContractReferencesCall> {
@@ -19,6 +18,10 @@ public class GetContractReferencesCall extends APICall.Builder<GetContractRefere
 
     public GetContractReferencesCall firstIndex(int firstIndex) {
         return param("firstIndex", firstIndex);
+    }
+
+    public GetContractReferencesCall includeContract(boolean includeContract) {
+        return param("includeContract", includeContract);
     }
 
     public GetContractReferencesCall contractName(String contractName) {

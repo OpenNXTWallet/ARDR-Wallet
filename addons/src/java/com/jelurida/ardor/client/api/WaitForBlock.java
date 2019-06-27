@@ -1,3 +1,18 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package com.jelurida.ardor.client.api;
 
 import nxt.addons.JA;
@@ -10,7 +25,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 
 /**
- * Register a listener and wait for the next block
+ * Sample Java program which registers a listener and waits for the next block
  */
 public class WaitForBlock {
 
@@ -37,7 +52,7 @@ public class WaitForBlock {
             // keep and Http request open for a long time.
             while (true) {
                 // Wait up to 1 second for the event to occur
-                response = EventWaitCall.create().timeout("1").token(token).remote(remoteUrl).call();
+                response = EventWaitCall.create().timeout(1).token(token).remote(remoteUrl).call();
                 Logger.logInfoMessage("EventWaitCall %s", response.toJSONString());
                 events = response.getArray("events");
                 if (events.size() > 0) {
@@ -50,7 +65,7 @@ public class WaitForBlock {
         } finally {
             if (token != null) {
                 // Unregister the event listener
-                response = EventRegisterCall.create().token(token).remove("true").remote(remoteUrl).call();
+                response = EventRegisterCall.create().token(token).remove(true).remote(remoteUrl).call();
                 Logger.logInfoMessage("EventRegisterCall remove %s", response.toJSONString());
             }
         }

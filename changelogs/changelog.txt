@@ -1,3 +1,629 @@
+ardor-client-2.2.4, released 2019-06-13:
+
+This release introduces the StandbyShuffler add-on, a new feature intended to
+simplify the use of our flagship privacy feature, fully decentralized and
+trustless Shuffling.
+
+A StandbyShuffler, as opposed to a regular Shuffler, does not start a new
+shuffling immediately, but runs in the background and waits for other users to
+start a shuffling which matches the StandbyShuffler parameters - holding (coin,
+asset or currency), minimum and maximum amounts, and number of participants.
+When such a shuffling is created, the StandbyShuffler joins it automatically. A
+StandbyShuffler is configured on start with a number of recipient public keys
+to use as recipients in each shuffling it joins, and shuts down once all have
+been used.
+
+Running a StandbyShuffler requires a full node, not just a light client.
+To enable the StandbyShuffler add-on, add nxt.addons.StandbyShuffling to the
+list of enabled add-ons in the nxt.addOns property. This add-on registers three
+new APIs:
+
+StartStandbyShuffler - start a StandbyShuffler. The secretPhrase of the
+shuffling account must be supplied. The holdingType and holding parameters
+define the coin, asset or currency for which to listen for shufflings being
+started. The optional minAmount, maxAmount and minParticipants parameters can
+be used to limit which shufflings to join. The recipientPublicKeys parameter
+holds one or more public keys, used one at a time as a recipient account public
+key each time a shuffling is joined. This can be specified either as a multi-
+value parameter, or a single text value holding multiple public keys separated
+by newlines. The feeRateNQTPerFXT parameter specifies what rate to use when
+calculating the child chain fees for each shuffling transaction submitted.
+Since the market rate can change between when the StandbyShuffler is started
+and an actual shuffling is joined, one should use a high enough rate to make
+sure shuffling transactions of the StandbyShuffler account are always bundled.
+
+GetStandbyShufflers - returns a list of all StandbyShufflers running on the
+node, optionally filtered using holdingType, holding and account parameters.
+If not running locally, a secretPhrase or admin password are required.
+
+StopStandbyShuffler - stops the StandbyShuffler for a specified account and
+holding or all StandbyShufflers running on the node if account is not
+specified. If not running locally, a secretPhrase or admin password are
+required.
+
+An UI for starting, observing, or stopping StandbyShufflers has been added
+under Shuffling / My StandbyShufflers.
+
+To automate starting the configured StandbyShufflers when the node is
+restarted, a set of StartStandbyShuffling, SaveStandbyShufflingEncrypted, and
+StartStandbyShufflingEncrypted add-ons has been provided.
+
+StartStandbyShuffling automatically starts one or more StandbyShufflers as
+defined in a file set in the nxt.startStandbyShufflingFile property. The
+format of this JSON file is the same as the JSON output of GetStandbyShufflers,
+with secretPhrase field added for each StandbyShuffler, thus the simplest way
+to generate it is first to setup StandbyShufflers as required and then save
+and edit the GetStandbyShufflers response.
+
+Alternatively, to avoid keeping the secretPhrase and recipient public keys in
+a plain text file, the SaveStandbyShufflingEncrypted add-on can be used to save
+the StandbyShufflers configuration JSON in an encrypted file, and the
+StartStandbyShufflingEncrypted add-on to start them by submitting the
+decryption password through the API.
+
+
+Added ChangeNOW as an integrated exchange in the wallet, allowing exchange of
+Ignis and Ardor to any coin supported by ChangeNOW.
+
+Permanently disallowed outgoing transactions from the new @ArdorBurnAccount,
+see announcement at https://www.jelurida.com/ardor-burn-account
+
+Pause forging if there are not enough connected peers from which to download
+the blockchain, as defined in nxt.numberOfForkConfirmations or
+nxt.testnetNumberOfForkConfirmations, unless nxt.isOffline=true. This is to
+avoid building a fork if the node is temporarily disconnected. To disable this
+behavior, set nxt.pauseForgingOnNoConnection=false (default is true).
+
+Do not allow accounts under account control to start a Funding Monitor.
+
+The SaveBundlingEncrypted, SaveForgingEncrypted, SaveFundingMonitorEncrypted
+APIs now require admin password when running on a remote node.
+
+Added a list of full transaction hashes with chain ids to the response of the
+getUnconfirmedTransactionIds API.
+
+Added a new bundling filter, nxt.addons.TransactionTypeBundler, which bundles
+only transactions of the transaction types specified in the filter parameter.
+The parameter must be a comma separated list of <type>:<subtype> pairs with
+the "type" and "subtype" of the whitelisted transaction types.
+
+Improved propagation of bundler rates between peers and calculation of best
+bundler rates. The CalculateFee, GetBundlerRates, and all CreateTransaction
+APIs now take both minBundlerBalanceFXT and minBundlerFeeLimitFQT parameters,
+with defaults based on the nxt.minBundlerBalanceFXT (default 1000 ARDR) and
+nxt.minBundlerFeeLimitFXT (default 10 ARDR) properties.
+Bundlers with effective balance lower than minBundlerBalanceFXT, or remaining
+fee limit or available ARDR balance lower than minBundlerFeeLimitFQT, are
+excluded from the best rates calculation.
+
+Shamir secret sharing passphrases can now be used to sign transaction
+vouchers.
+
+Updated Jetty to version 9.4.18. This release fixes a Jetty bug which causes
+a server hang after high load, therefore an update is highly recommended.
+
+The Jelurida Public License has been updated to version 1.2, to clarify that
+Ardor code is not portable to Nxt clones unless the JPL requirements for Ardor
+are also satisfied (article 3.4.2 of the General Conditions), and to require
+that airdrops, including the fact that they are done in order to satisfy the
+JPL, are announced at least a month before the planned snapshot date (article
+2.2 of the Special Conditions).
+
+
+--------------------------------------------------------------------------------
+ardor-client-2.2.3, released 2019-04-23:
+
+This release adds multiple usability enhancements, optimizations and bug fixes.
+For users of 2.2.1 or 2.2.2, upgrade is optional but highly recommended.
+
+New feature: Shamir Secret Sharing
+
+Shamir Secret Sharing support is now enabled for both client and server. It
+allows splitting a passphrase into N pieces out of which only K are required to
+restore the original secret. This technique is useful to protect the full
+passphrase from key loggers on the client workstation and from eavesdropping
+during transport to a remote node. Shamir Secret Sharing is also useful for the
+creation of fragmented backups, by storing each piece in a different physical
+place or with a different trusted party, with at least K of them required to
+recover the full passphrase.
+
+Secret share splitting and combining is supported both on the server side using
+the node APIs, and client side in the wallet, so that secrets split on one side
+can be combined on the other.
+
+Client side
+
+When printing a paper wallet, a new dialog enables setting the total number of
+secret pieces to generate from a passphrase, and the number of secrets required
+to re-combine a passphrase. These secrets are then printed into separate pages
+of the paper wallet.
+
+For all dialogs which accept entry of a passphrase the user can now check the
+"Shared Secret" checkbox, then enter or scan the required number of secret
+pieces to combine the original passphrase in memory.
+
+Server side
+
+Any API which accepts the "secretPhrase" parameter can now accept instead 
+multiple "sharedPiece" parameters which the node will combine into the original
+passphrase in memory. A node can keep some of the secrets in its configuration
+file while accepting other secrets using API parameters.
+To configure this setup for account address X, split your passphrase into 
+several pieces then list some of the pieces in a semicolon separated list as the
+value of the property nxt.secretPhrasePieces.X. When using the API, submit the
+parameter sharedPieceAccount=X where X is the account address, and also submit
+the remaining required pieces using multiple sharedPiece parameters. This
+configuration enables to start forging, bundling, etc, on a remote node without
+ever transmitting the full account passphrase to it over the internet.
+
+New APIs for Shamir Secret Sharing:
+
+Use the splitSecret API to split a passphrase into pieces.
+
+Use the combineSecret API to combine secret pieces to the original passphrase.
+
+
+Contracts
+
+Due to enhancements to the underlying API caller infrastructure all lightweight
+contracts have to be recompiled and redeployed in order for a contract runner
+running this version to be able to execute them correctly.
+
+Any other code using the API callers must also be recompiled.
+
+
+Installation
+
+The Windows and Mac installers now bundle a copy of OpenJDK 11 and Java FX sdk.
+OpenJDK is installed into the jdk folder.
+Java FX is installed into the javafx-sdk folder.
+The jre folder which included the Java distribution in previous releases is no 
+longer created by the installation.
+Users who created customized scripts relying on the jre folder should adjust 
+their scripts to the new structure.
+For the linux installation package, the code is compiled with OpenJDK 8, and
+can still be run under either Java 8, or Java 11 or 12. For Windows and Mac,
+the installation package is compiled using Java 11.
+
+
+UI improvements
+
+When loading a transaction voucher it is now possible to attach an encrypted
+message to yourself, and to recalculate the transaction fee. It is now also
+possible to not immediately broadcast voucher transaction, for the purpose of
+offline signing.
+
+The coin exchange displays the inverse rate in the "Buy" dialog, and as a 
+tooltip when hoovering with the mouse over any price field.
+Expected orders and order cancellations (unconfirmed or phased) are displayed
+in the order book with a special icon to their left.
+Left pane balances are updated with each new block. 
+The order of columns was changed so that the "Sum" column displays the coin to 
+buy, clicking the "Sum" column updates the amount to buy accordingly.
+Red warning is displayed when typing an amount to buy which requires larger 
+balance than the available balance. Total field is limited to 8 decimals.
+
+The dashboard transaction view was improved to reduce appearances of duplicate
+transactions when the transaction moves from unconfirmed to confirmed status.
+
+Support login by alias and recipient alias for any alias. If not an account
+alias, map the alias to the alias owner account. Since any alias owned by an
+account can now be used as an alias to the account, this release deprecates
+the so-called "account" aliases, and we will remove support for them in the
+next release.
+
+Approximate leasing expiration date is displayed in the Account Leasing tab.
+
+A new Account Properties tab has been added to the account info modal,
+displaying all properties set on the account.
+
+
+Networking and performance improvements.
+
+As a result of our extensive load testing efforts, this release includes
+several networking stability improvements and performance optimizations.
+
+
+New add-ons to simplify automated and secure running of tasks on remote nodes:
+
+A set of custom add-ons to automate forging, bundling, and funding monitors
+has been include in this release.
+
+The StartForging add-on reads the passphrases stored in a plain text file, as
+defined in the property nxt.startForgingFile, one passphrase per line, and
+automatically starts forging with each of these accounts when the server is
+started. Since passphrases are stored unencrypted, this add-on should only
+be used on well secured servers, or with accounts of insignificant value, or
+in test environments.
+
+For a secure way of starting forging with multiple accounts on a remote server,
+the SaveForgingEncrypted add-on can be used to store the passphrases of forging
+accounts in an encrypted file, and the StartForgingEncrypted add-on to start
+forging with them by only submitting to the server the password necessary to
+decrypt this file. Note that at runtime, the forging account passphrases will
+still be kept in server memory, but when using these add-ons will never need to
+be stored on disk, and will not need to be re-submitted to the server each time
+forging needs to be started. These add-ons are useful when forging on a fully
+trusted node, and having to restart forging remotely without a risk of exposing
+the passphrases in transit.
+
+The StartBundling add-on reads a list of Bundlers stored in a JSON formatted
+file, as defined in the property nxt.startBundlingFile. The exact JSON can be
+initially generated by manually starting the bundlers configured as desired,
+including any custom bundling rules, and using the GetBundlers API to retrieve
+the list of bundlers in JSON format. The only manual modification required is
+to add a "secretPhrase" parameter to the JSON for each bundler, with the
+corresponding account secret phrase. On server start, the StartBundling add-on
+will automatically start all bundlers as configured.
+
+Similarly to the above forging add-ons, the SaveBundlingEncrypted and
+StartBundlingEncrypted add-ons can be used to store the JSON configuration of
+bundlers in an encrypted instead of plain text file, and start the bundlers
+on submitting the decryption password to the server.
+
+Finally, for automating funding monitors, the StartFundingMonitors add-on will
+automatically start all funding monitors configured in a JSON formatted file,
+as defined in the property nxt.startFundingMonitorsFile. The JSON can be
+generated by manually starting the funding monitors as desired, and using the
+GetFundingMonitor API to retrieve the list of monitors in JSON format. Again,
+the secretPhrase parameter needs to be manually added to the JSON for each
+funding monitor.
+
+The SaveFundingMonitorsEncrypted and StartFundingMonitorsEncrypted add-ons
+allow storing the JSON configuration of funding monitors in an encrypted
+instead of plain text file, and starting the funding monitors by submitting
+only the decryption password to the server.
+
+
+Other improvements:
+
+The CalculateFee API now also returns the required child chain fee based on
+the best bundling rate available, as feeNQT.
+
+The JPLSnapshot add-on has been ported to Ardor. It can be used to generate
+a JPL-compliant snapshot of Ignis child chain balances.
+
+Starting a funding monitor or shuffler with feeRateNQTPerFXT=0 is now allowed.
+
+
+Library updates:
+
+Updated Jetty to version 9.4.17, Bouncy Castle to 1.61, and H2 database to
+1.4.199. With the new H2 release, using MVStore mode is the default. However,
+conversion of existing databases to MVStore format is not automatic. To
+migrate to the new storage format, the easiest way is to use the compact.sh
+or compact.bat script, which should take a few minutes, and will also improve
+the database performance.
+
+
+--------------------------------------------------------------------------------
+ardor-client-2.2.2:
+
+This is a bug fix and usability enhancements release.
+
+Users still using version 2.2.0e or earlier must upgrade immediately as they are
+already on a fork, and their nodes are blacklisted by this release.
+
+Anyone who did not upgrade to 2.2.1 prior to block 543000 must manually delete
+and re-download the blockchain from scratch, after upgrading.
+
+Users using version 2.2.1 are not required to upgrade.
+
+
+Contracts:
+
+Added an includeContract parameter to the getContractReferences API to return
+metadata about the actual contract being referenced.
+
+The contract runner now removes the last block when started to make sure 
+trigger transactions in the last block are processed in case processing stopped 
+before processing the contracts for this block.
+
+Contract unit tests now use simpler methods for verifying transactions submitted 
+by a contract.
+
+The contract manager now waits until the transactions it submitted are included
+in a new block before exiting.
+
+Contracts with an inner interface and an inner class implementing it are now
+supported.
+
+The contract processRequest callback now supports initializing a randomness 
+source and accessing the last block.
+
+Fail gracefully when a contract submits the messageToEncrypt parameter without a
+passphrase. Contract devs should encrypt the message first then submit the
+encrypted data.
+
+
+UI Enhancements:
+
+Contract selection widget and contract parameter specification template were 
+added to dialogs which specify a recipient field. This enhancement simplifies 
+the task of configuring a contract trigger transaction.
+
+The Contracts page now provides simple runtime statistics about contract 
+execution when clicking on any of the invocation types in the Invocation column.
+
+Each chain now has a chain description displayed in the wallet and when 
+switching between chains.
+
+Login by account using an Ignis alias is now supported by deleting the ARDOR 
+prefix then typing '@' in front of an existing alias name which is mapped to an
+account id.
+
+"Fat Finger" warning for amount and fee is now defined and enforced per chain.
+Reasonable default values were defined.
+Use the account settings page to adjust these values for the current chain.
+
+Dialogs now support more than one warning per form submit. 
+For example in case both the amount and the fee are too high, both warnings are 
+displayed one after the other.
+
+The wallet no longer warns about assets and currencies with more than 6 
+decimals.
+
+The Changelly menu items was moved from a top level menu to the settings menu to
+provide more screen real estate for the mobile app.
+
+Increase and delete shares links are displayed in the "My Assets" page only when
+these actions are allowed.
+
+Vouchers with unicode parenthesis are now parsed correctly.
+
+The desktop wallet now displays a file chooser dialog before downloading a cloud 
+data item or message attachment to the local workstation.
+
+The transaction and block info dialogs now display the raw transaction and block
+json in a separate tab.
+
+Coin exchange layout improvements.
+
+
+Others:
+
+Fixed an initialization issue that could cause some custom add-ons to deadlock
+on start. 
+
+Fixed false positive unsigned bytes verification error when cancelling
+ARDR buy order.
+
+The getPeers and dumpPeers APIs now also allow filtering by version, optionally
+including newer versions.
+
+Added a checkpoint at block 545555.
+
+Updated Jetty to version 9.4.14.
+
+
+--------------------------------------------------------------------------------
+ardor-client-2.2.1:
+
+This release adds support for the new Max Crowdfund (formerly Dominium) child
+chain, token name MPG, to be activated at block 543000 expected to be reached on
+January 10, 2019.
+
+At the same block, the new Lightweight Contracts and Asset Properties features
+will also become enabled on mainnet.
+
+Transactions with asset 6066975351926729052 (old CtC) will be disabled and open
+orders cancelled.
+
+Revealing a secret using the ApproveTransaction API will now approve all phased 
+by hash transactions which specified the hash of this secret regardless if they
+are listed in the phasedTransaction parameter or not.
+
+A new GetHashedSecretPhasedTransactions API will return a list of phased by hash
+transactions with phasingHashedSecret and phasingHashedSecretAlgorithm as 
+specified.
+
+This is a stable release and a mandatory upgrade for all nodes, with block
+543000 (Jan 10) as final deadline.
+
+
+Lightweight Contracts:
+
+Contract validations now use Java annotations. The following annotations are
+available:
+@ValidateContractRunnerIsRecipient - checks that the contract runner account is 
+the recipient of the trigger transaction.
+@ValidateContractRunnerIsSender - checks that the contract runner account is the
+sender of the transaction.
+@ValidateChain - checks that the chain of the trigger transaction is in the 
+accept array and is not in the reject array.
+@ValidateTransactionType - checks that the type of the trigger transaction is 
+one of the types in the accept array and is not one of the types in the reject
+array. A new TransactionTypeEnum class lists all available transaction types and 
+sub types.
+
+See the HelloWorldForwarder sample contract for usage example of the validations
+
+The contract runner getSupportedContracts API was enhanced to return more meta-
+data about the running contracts including the supported invocation types,
+contract invocation parameters, and contract validations. 
+This information can be used by clients to provide better user experience by 
+analyzing the contract capabilities and helping the user properly trigger the 
+contract. 
+
+Contracts can override the built-in duplicate checks for transactions submitted 
+by a contract by overriding the isDuplicate() method. 
+Oracle contracts should implement this method to make sure they do not submit 
+the same transaction more than once with different data. 
+See for example the IgnisArdorRates contract.
+
+Added uploadContractRunnerConfiguration API to let contract runner node admin 
+upload the contract runner config after starting the node. 
+This way contract runner nodes no longer need to store the contract runner 
+account passphrase or other sensitive data on the node itself. 
+Instead, they can upload it after starting the node from the contracts page in 
+the wallet. The format of the uploaded configuration file is the same as the
+existing contracts.json format.
+
+To prevent a contract runner from locking user funds permanently in the contract 
+runner account in case the contract does not execute, contract transactions can
+be submitted with phasing by hashed secret. The contract runner will submit its
+own transactions using the same hashed secret and other phasing parameters.
+The trigger transaction, and transactions submitted by the contract in response,
+are either approved together or rejected together. 
+If a transaction is not approved when reaching its finish height, its funds are 
+released back to the sender.
+
+To assist with generating secure secrets to hash, a new secret generator wizard
+was added to the wallet approval modals dialog. Generated secrets are not saved 
+by the client.
+A secret can be reproduced by the client in case it was lost, using the account
+passphrase used when generating it.
+
+The parameter injection introduced in version 2.2.0e was replaced with a more
+robust solution based on an interface. In the new design, invocation, setup and 
+runner parameters are defined using an inner interface decorated with the 
+@ContractParametersProvider annotation. 
+For each contract parameter create a default method which defines its name, 
+data type and default value, decorated with a contract parameter annotation:
+@ContractInvocationParameter - specified by a trigger transaction or voucher.
+@ContractSetupParameter - specified by the contract reference.
+@ContractRunnerParameter - specified by the contract runner configuration.
+To load the contract parameters from inside your contract code use the following
+statement:
+Params params = context.getParams(Params.class);
+Where Params is the inner interface decorated with @ContractParametersProvider 
+annotation.
+
+Due to interface changes introduced by this release, all existing contracts will
+have to be redeployed on testnet and contract runners using a previous version
+won't be able to run contracts deployed using the current version.
+
+
+UI Enhancements:
+
+A contracts page was added to the wallet to list the information provided by 
+the getSupportedContracts API. This page is available only when the wallet is 
+connected to a contract runner node.
+
+Asset properties UI was implemented accessible from the "Asset Properties" link
+on the asset exchange page. Users can use it to set, update, and delete asset
+properties.
+
+When entering recipient address in the client wallet use the @ prefix to point 
+to an existing Ignis alias which stores the account id. In previous versions the
+alias was loaded from the current chain.
+
+The contacts button to the right of the recipient field now lists all the 
+remembered accounts in addition to the defined contacts.
+
+
+Updating to this release from 2.2.0e may cause a one time shutdown on first
+start in order to fully apply the database changes.
+
+
+--------------------------------------------------------------------------------
+ardor-client-2.2.0e:
+
+This is an experimental release, and a MANDATORY upgrade for all testnet nodes.
+It can also be used on mainnet.
+
+Added Asset Properties feature, to be activated at block 455000 on testnet only.
+
+Asset Properties allow attaching metadata to assets, in the form of name/value
+pairs. The property name can be up to 32 characters, and property value up to
+160 characters in length. Anyone can set a property on an asset. Only the asset
+issuer, or the setter of the property, can delete a property. The setter of a
+property can edit it by setting a new property with the same name.
+
+New APIs: SetAssetProperty, DeleteAssetProperty, GetAssetProperties.
+
+Implemented freezing of assets and currencies, to be used for tokens that are
+scheduled to become child chains, or need to be deactivated for other reasons.
+
+Freezing of arbitrary assets or currencies is not (and will not be) supported.
+The freezing of a particular holding must first be enabled in a new release,
+and is then triggered at a predefined height, optionally specified as asset
+property for assets, or account property for currencies.
+
+After the freeze height, no further transactions with the frozen holding are
+possible (with the exception of setting or deleting asset properties). Freezing
+is not reversible.
+
+Implemented migration of a frozen asset or currency to a new child chain. The
+migration of a particular holding must first be enabled in a new release, and
+is then triggered at a predefined height, optionally specified as asset property
+for assets, or account property for currencies.
+
+Implemented loading of account balances for new child chains. The Dominium child
+chain will be launched on testnet at or after block 455000, with testnet
+balances allocated to developer accounts only.
+
+Fixed loading transaction voucher which contains attached encrypted message.
+
+Node log file name changed from nxt.log to ardor.{n}.log where {n} is the log
+file number. The current log file is always named ardor.0.log. Up to 10 log
+files are kept.
+
+The windows startup script run.bat no longer relies on the windows registry
+when looking up the Java version.
+
+Lightweight Contracts:
+
+The contract runner now executes contracts in their own sandbox which restricts
+the contract permissions based on a standard Java policy file named ardor.policy
+By default contracts allowed to connect to any address, and read, write and 
+delete files in the temp folder of the contract runner workstation. Direct 
+access to the local workstation, or the local blockchain not through the APIs
+is blocked by default. The contract runner operator can grant additional 
+permissions per contract or for all contracts submitted by a specific account. 
+See examples in ardor.policy file.
+
+Added support for deployment and verification of single source file contract 
+which compiles into multiple class files. The contract classes are automatically 
+packaged into a Jar file when deployed to the blockchain. Similarly verification
+of the contract unpacks the Jar and compares individual class files.
+
+Parameter injection is now supported using the ContractInvocationParameter,
+ContractSetupParameter and ContractRunnerParameter annotations. This reduces
+contract boiler plate code for reading parameters. 
+
+Contract class selector was added to the contract manager plugin. Users 
+upgrading from a previous release will need to redeploy the IntelliJ plugin 
+after installing this version. The plugin version should be 2.2.0.
+
+Contract runner parameters can be specified in the nxt.properties file using
+the addon.contractRunner. prefix. The contracts.json configuration file is now
+only used when specifying secret contract runner parameters so can be ignored
+in most configuration.
+
+It is no longer required to define contracts which do not setup parameters in 
+the contract.uploader.json file.
+
+See: https://ardordocs.jelurida.com/Lightweight_Contracts for more details and 
+examples.
+
+Due to interface changes introduced by this release, all existing contracts will
+have to be redeployed on testnet and contract runners using a previous version
+won't be able to run contracts deployed using the current version.
+
+On testnet only, after block 455000 the average block time will be reduced to
+10 seconds. This is to allow faster testing and development, and to test the
+feasibility of reducing block time should the need arise on mainnet.
+
+
+--------------------------------------------------------------------------------
+ardor-client-2.1.2:
+
+This is a critical bugfix release. IMMEDIATE update is mandatory for everyone.
+
+Fixed validation of string fields length in transaction attachments.
+
+This is a stable release and should be used for mainnet nodes too, however
+lightweight contracts are still available only on testnet.
+
+Changelly exchange integration is now available in the Ardor wallet:
+
+https://nxtwiki.org/wiki/Changelly_Integration
+
+Javadoc is now available for sample contracts and API callers.
+
+
+--------------------------------------------------------------------------------
 ardor-client-2.1.1e:
 
 This is an experimental release. It is a mandatory upgrade only for testnet

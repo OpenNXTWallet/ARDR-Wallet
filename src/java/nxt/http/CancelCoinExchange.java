@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -59,7 +59,7 @@ public final class CancelCoinExchange extends CreateTransaction {
         Attachment attachment = (txChain.getId() == FxtChain.FXT.getId() ?
                 new OrderCancelFxtAttachment(orderHash) : new OrderCancelAttachment(orderHash));
         try {
-            return createTransaction(req, account, attachment, txChain);
+            return transactionParameters(req, account, attachment).setTxChain(txChain).createTransaction();
         } catch (NxtException.InsufficientBalanceException e) {
             return NOT_ENOUGH_FUNDS;
         }

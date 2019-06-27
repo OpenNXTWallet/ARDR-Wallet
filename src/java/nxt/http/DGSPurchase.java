@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -80,7 +80,7 @@ public final class DGSPurchase extends CreateTransaction {
         Attachment attachment = new PurchaseAttachment(goods.getId(), quantity, priceNQT,
                 deliveryDeadline);
         try {
-            return createTransaction(req, buyerAccount, sellerAccount.getId(), 0, attachment);
+            return transactionParameters(req, buyerAccount, attachment).setRecipientId(sellerAccount.getId()).createTransaction();
         } catch (NxtException.InsufficientBalanceException e) {
             return JSONResponses.NOT_ENOUGH_FUNDS;
         }

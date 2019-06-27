@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -19,7 +19,6 @@ package nxt.http;
 import nxt.Constants;
 import nxt.Nxt;
 import nxt.account.HoldingType;
-import nxt.blockchain.Bundler;
 import nxt.blockchain.Chain;
 import nxt.blockchain.ChildChain;
 import nxt.blockchain.ChildTransactionType;
@@ -42,7 +41,6 @@ import org.json.simple.JSONStreamAware;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -284,6 +282,7 @@ public final class GetConstants extends APIServlet.APIRequestHandler {
                 });
                 response.put("chainProperties", chainPropertiesJSON);
                 response.put("initialBaseTarget", Long.toUnsignedString(Constants.INITIAL_BASE_TARGET));
+                response.put("secretPhraseWords", Constants.COMPRESSED_SECRET_PHRASE_WORDS);
                 CONSTANTS = JSON.prepare(response);
             } catch (Exception e) {
                 Logger.logErrorMessage(e.toString(), e);

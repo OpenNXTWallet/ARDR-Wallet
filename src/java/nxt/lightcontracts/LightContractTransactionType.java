@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -17,7 +17,6 @@
 package nxt.lightcontracts;
 
 import nxt.Constants;
-import nxt.Nxt;
 import nxt.NxtException;
 import nxt.account.Account;
 import nxt.account.AccountLedger;
@@ -30,8 +29,6 @@ import nxt.blockchain.Transaction;
 import nxt.blockchain.TransactionImpl;
 import nxt.blockchain.TransactionType;
 import org.json.simple.JSONObject;
-import org.json.simple.JSONValue;
-import org.json.simple.parser.ParseException;
 
 import java.nio.ByteBuffer;
 
@@ -79,7 +76,7 @@ public abstract class LightContractTransactionType extends ChildTransactionType 
         private final Fee CONTRACT_REFERENCE_ANNOUNCE_FEE = new Fee.SizeBasedFee(Constants.ONE_FXT / 10, Constants.ONE_FXT / 10, 32) {
             @Override
             public int getSize(TransactionImpl transaction, Appendix appendage) {
-                ContractReferenceAttachment attachment = (ContractReferenceAttachment)transaction.getAttachment();
+                ContractReferenceAttachment attachment = (ContractReferenceAttachment) transaction.getAttachment();
                 return attachment.getSize();
             }
         };
@@ -116,9 +113,6 @@ public abstract class LightContractTransactionType extends ChildTransactionType 
 
         @Override
         public void validateAttachment(ChildTransactionImpl transaction) throws NxtException.ValidationException {
-            if (Nxt.getBlockchain().getHeight() < Constants.LIGHT_CONTRACTS_BLOCK) {
-                throw new NxtException.NotYetEnabledException("Light contracts not yet enabled");
-            }
             ContractReferenceAttachment attachment = (ContractReferenceAttachment) transaction.getAttachment();
             String contractParams = attachment.getContractParams();
             if (!ContractReferenceAttachment.NAME_RW.validate(attachment.getContractName())
@@ -189,9 +183,6 @@ public abstract class LightContractTransactionType extends ChildTransactionType 
 
         @Override
         public void validateAttachment(ChildTransactionImpl transaction) throws NxtException.ValidationException {
-            if (Nxt.getBlockchain().getHeight() < Constants.LIGHT_CONTRACTS_BLOCK) {
-                throw new NxtException.NotYetEnabledException("Light contracts not yet enabled");
-            }
             ContractReferenceDeleteAttachment attachment = (ContractReferenceDeleteAttachment) transaction.getAttachment();
             ContractReference contractReference = ContractReference.getContractReference(attachment.getContractReferenceId());
             if (contractReference == null) {

@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -16,11 +16,10 @@
 
 package nxt.db;
 
+import nxt.Constants;
 import nxt.Nxt;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
+import java.sql.*;
 
 public abstract class DerivedDbTable extends Table {
 
@@ -34,9 +33,13 @@ public abstract class DerivedDbTable extends Table {
             throw new IllegalStateException("Not in transaction");
         }
         try (Connection con = getConnection();
-             PreparedStatement pstmtDelete = con.prepareStatement("DELETE FROM " + schemaTable + " WHERE height > ?")) {
+             PreparedStatement pstmtDelete = con.prepareStatement("DELETE FROM " + schemaTable + " WHERE height > ? LIMIT " + Constants.BATCH_COMMIT_SIZE)) {
             pstmtDelete.setInt(1, height);
-            pstmtDelete.executeUpdate();
+            int deleted;
+            do {
+                deleted = pstmtDelete.executeUpdate();
+                db.commitTransaction();
+            } while (deleted >= Constants.BATCH_COMMIT_SIZE);
         } catch (SQLException e) {
             throw new RuntimeException(e.toString(), e);
         }
@@ -44,6 +47,26 @@ public abstract class DerivedDbTable extends Table {
 
     public void rollback(int height) {
         popOffTo(height);
+    }
+
+    @Override
+    public void truncate() {
+        if (!db.isInTransaction()) {
+            throw new IllegalStateException("Not in transaction");
+        }
+        boolean hasPermanentRecords;
+        try (Connection con = getConnection();
+             Statement stmt = con.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT * FROM " + schemaTable + " WHERE height < 0 LIMIT 1")) {
+            hasPermanentRecords = rs.next();
+        } catch (SQLException e) {
+            throw new RuntimeException(e.toString(), e);
+        }
+        if (hasPermanentRecords) {
+            popOffTo(-1);
+        } else {
+            super.truncate();
+        }
     }
 
     public void trim(int height) {

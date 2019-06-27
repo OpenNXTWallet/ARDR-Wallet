@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -31,6 +31,7 @@ import nxt.util.Convert;
 import nxt.util.Listener;
 import nxt.util.Listeners;
 import nxt.util.Logger;
+import nxt.util.security.BlockchainPermission;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -270,9 +271,17 @@ public class AccountLedger {
      * Commit pending ledger entries
      */
     public static void commitEntries() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("ledger"));
+        }
+        int count = 0;
         for (LedgerEntry ledgerEntry : pendingEntries) {
             accountLedgerTable.insert(ledgerEntry);
             listeners.notify(ledgerEntry, Event.ADD_ENTRY);
+            if (++count % Constants.BATCH_COMMIT_SIZE == 0) {
+                Db.db.commitTransaction();
+            }
         }
         pendingEntries.clear();
     }
@@ -291,6 +300,10 @@ public class AccountLedger {
      * @return                              Ledger entry or null if entry not found
      */
     public static LedgerEntry getEntry(long ledgerId) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("ledger"));
+        }
         if (!ledgerEnabled)
             return null;
         LedgerEntry entry;
@@ -325,6 +338,10 @@ public class AccountLedger {
     public static List<LedgerEntry> getEntries(long accountId, LedgerEvent event, long eventId,
                                                 LedgerHolding holding, long holdingId,
                                                 int firstIndex, int lastIndex) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("ledger"));
+        }
         if (!ledgerEnabled) {
             return Collections.emptyList();
         }
@@ -433,6 +450,9 @@ public class AccountLedger {
             ASSET_DELETE(26, true),
             ASSET_INCREASE(61, true),
             ASSET_SET_PHASING_CONTROL(62, true),
+            ASSET_PROPERTY_SET(65, true),
+            ASSET_PROPERTY_DELETE(66, true),
+
         // TYPE_DIGITAL_GOODS
             DIGITAL_GOODS_DELISTED(27, true),
             DIGITAL_GOODS_DELISTING(28, true),
@@ -530,6 +550,10 @@ public class AccountLedger {
          * @return                          Event
          */
         public static LedgerEvent fromCode(int code) {
+            SecurityManager sm = System.getSecurityManager();
+            if (sm != null) {
+                sm.checkPermission(new BlockchainPermission("ledger"));
+            }
             LedgerEvent event = eventMap.get(code);
             if (event == null) {
                 throw new IllegalArgumentException("LedgerEvent code " + code + " is unknown");
@@ -621,6 +645,10 @@ public class AccountLedger {
     }
 
     public static LedgerEventId newEventId(long eventId, byte[] eventHash, Chain chain) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("ledger"));
+        }
         return new LedgerEventId() {
             @Override
             public long getId() {
@@ -638,10 +666,18 @@ public class AccountLedger {
     }
 
     public static LedgerEventId newEventId(Transaction transaction) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("ledger"));
+        }
         return transaction;
     }
 
     public static LedgerEventId newEventId(Block block) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("ledger"));
+        }
         return new LedgerEventId() {
             @Override
             public long getId() {

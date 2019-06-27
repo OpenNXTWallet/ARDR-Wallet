@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -90,7 +90,7 @@ public final class StartFundingMonitor extends APIServlet.APIRequestHandler {
             return JSONResponses.incorrect("threshold", "Minimum funding threshold is " + FundingMonitor.MIN_FUND_THRESHOLD);
         }
         int interval = ParameterParser.getInt(req, "interval", FundingMonitor.MIN_FUND_INTERVAL, Integer.MAX_VALUE, true);
-        long feeRateNQTPerFXT = ParameterParser.getLong(req, "feeRateNQTPerFXT", 1, Constants.MAX_BALANCE_NQT, true);
+        long feeRateNQTPerFXT = ParameterParser.getLong(req, "feeRateNQTPerFXT", 0, Constants.MAX_BALANCE_NQT, true);
         String secretPhrase = ParameterParser.getSecretPhrase(req, true);
         switch (holdingType) {
             case ASSET:
@@ -120,9 +120,14 @@ public final class StartFundingMonitor extends APIServlet.APIRequestHandler {
         if (account == null) {
             return UNKNOWN_ACCOUNT;
         }
-        if (FundingMonitor.startMonitor(chain, holdingType, holdingId, property, amount, threshold, interval, secretPhrase, feeRateNQTPerFXT)) {
+        if (account.getControls().contains(Account.ControlType.PHASING_ONLY)) {
+            return JSONResponses.error("Accounts under phasing only control cannot run a funding monitor");
+        }
+        FundingMonitor monitor = FundingMonitor.startMonitor(chain, holdingType, holdingId, property, amount, threshold, interval, secretPhrase, feeRateNQTPerFXT);
+        if (monitor != null) {
             JSONObject response = new JSONObject();
             response.put("started", true);
+            response.put("monitor", JSONData.accountMonitor(monitor, false));
             return response;
         } else {
             return MONITOR_ALREADY_STARTED;

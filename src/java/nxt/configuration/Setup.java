@@ -1,3 +1,18 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package nxt.configuration;
 
 import java.util.ArrayList;
@@ -25,7 +40,7 @@ public interface Setup {
     Setup FULL_NODE = new Setup() {
 
         // Init and shutdown sequence are based on the old Nxt.init() and Nxt.shutdown() sequence
-        private List<SubSystem> initSequence = Arrays.asList(LOGGER, SYSTEM_TRAY, DB, BLOCKCHAIN, PEER_NETWORKING, ADDONS, API_SERVER, THREAD_POOL, RANDOMIZATION, DESKTOP_WALLET);
+        private List<SubSystem> initSequence = Arrays.asList(LOGGER, SYSTEM_TRAY, DB, BLOCKCHAIN, PEER_NETWORKING, ADDONS, THREAD_POOL, API_SERVER, RANDOMIZATION, DESKTOP_WALLET);
         private List<SubSystem> shutdownSequence = Arrays.asList(DESKTOP_WALLET, ADDONS, RANDOMIZATION, API_SERVER, THREAD_POOL, BLOCKCHAIN, PEER_NETWORKING, DB, LOGGER, SYSTEM_TRAY);
 
         @Override
@@ -56,7 +71,7 @@ public interface Setup {
     };
 
     Setup UNIT_TEST = new Setup() {
-        private List<SubSystem> initSequence = Arrays.asList(LOGGER, DB, BLOCKCHAIN, PEER_NETWORKING, API_SERVER, THREAD_POOL, RANDOMIZATION, ADDONS);
+        private List<SubSystem> initSequence = Arrays.asList(LOGGER, DB, BLOCKCHAIN, PEER_NETWORKING, ADDONS, THREAD_POOL, API_SERVER, RANDOMIZATION);
         private List<SubSystem> shutdownSequence = Arrays.asList(ADDONS, RANDOMIZATION, API_SERVER, THREAD_POOL, BLOCKCHAIN, PEER_NETWORKING, DB, LOGGER);
 
         @Override

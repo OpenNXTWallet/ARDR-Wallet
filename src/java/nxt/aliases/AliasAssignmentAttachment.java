@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -21,7 +21,6 @@ import nxt.NxtException;
 import nxt.blockchain.Attachment;
 import nxt.blockchain.TransactionType;
 import nxt.util.Convert;
-import nxt.util.bbh.LengthRwPrimitiveType;
 import nxt.util.bbh.StringRw;
 import org.json.simple.JSONObject;
 
@@ -57,17 +56,13 @@ public final class AliasAssignmentAttachment extends Attachment.AbstractAttachme
 
     @Override
     protected int getMySize() {
-        return 1 + Convert.toBytes(aliasName).length + 2 + Convert.toBytes(aliasURI).length;
+        return ALIAS_NAME_RW.getSize(aliasName) + ALIAS_URI_RW.getSize(aliasURI);
     }
 
     @Override
     protected void putMyBytes(ByteBuffer buffer) {
-        byte[] alias = Convert.toBytes(this.aliasName);
-        byte[] uri = Convert.toBytes(this.aliasURI);
-        buffer.put((byte)alias.length);
-        buffer.put(alias);
-        buffer.putShort((short) uri.length);
-        buffer.put(uri);
+        ALIAS_NAME_RW.writeToBuffer(aliasName, buffer);
+        ALIAS_URI_RW.writeToBuffer(aliasURI, buffer);
     }
 
     @Override

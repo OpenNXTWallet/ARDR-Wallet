@@ -1,3 +1,18 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package com.jelurida.ardor.contracts;
 
 import nxt.addons.AbstractContract;
@@ -8,7 +23,7 @@ import java.util.Map;
 
 /**
  * The DistributedRandomNumberGenerator is a utility contract which given a list of accounts and their weight, selects
- * randomly one the accounts. For example if there are 3 account with weights 5,3,2 the chance of the first account
+ * randomly one the accounts. For example, if there are 3 account with weights 5,3,2 the chance of the first account
  * being selected is 50% the 2nd 30% and the 3rd 20%.
  */
 public class DistributedRandomNumberGenerator extends AbstractContract<Map<String, Long>,String> {

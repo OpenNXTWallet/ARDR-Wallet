@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -23,32 +23,17 @@ import nxt.account.Account;
 import nxt.account.HoldingType;
 import nxt.ae.Asset;
 import nxt.aliases.AliasHome;
-import nxt.blockchain.Appendix;
-import nxt.blockchain.Bundler;
-import nxt.blockchain.Chain;
-import nxt.blockchain.ChainTransactionId;
-import nxt.blockchain.ChildChain;
-import nxt.blockchain.Transaction;
+import nxt.blockchain.*;
 import nxt.crypto.Crypto;
 import nxt.crypto.EncryptedData;
+import nxt.crypto.SecretSharingGenerator;
 import nxt.dgs.DigitalGoodsHome;
-import nxt.messaging.EncryptToSelfMessageAppendix;
-import nxt.messaging.EncryptedMessageAppendix;
-import nxt.messaging.MessageAppendix;
-import nxt.messaging.PrunableEncryptedMessageAppendix;
-import nxt.messaging.PrunablePlainMessageAppendix;
-import nxt.messaging.UnencryptedEncryptToSelfMessageAppendix;
-import nxt.messaging.UnencryptedEncryptedMessageAppendix;
-import nxt.messaging.UnencryptedPrunableEncryptedMessageAppendix;
+import nxt.messaging.*;
 import nxt.ms.Currency;
 import nxt.ms.ExchangeOfferHome;
 import nxt.shuffling.ShufflingHome;
 import nxt.taggeddata.TaggedDataAttachment;
-import nxt.util.BooleanExpression;
-import nxt.util.Convert;
-import nxt.util.JSON;
-import nxt.util.Logger;
-import nxt.util.Search;
+import nxt.util.*;
 import nxt.voting.PhasingParams;
 import nxt.voting.PollHome;
 import nxt.voting.VoteWeighting;
@@ -65,15 +50,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-import java.util.SortedMap;
-import java.util.StringJoiner;
-import java.util.TreeMap;
+import java.math.BigInteger;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static nxt.http.JSONResponses.*;
 
@@ -205,6 +185,17 @@ public final class ParameterParser {
             throw new ParameterException(incorrect(name));
         }
         return values;
+    }
+
+    public static BigInteger getBigInteger(HttpServletRequest req, String name, boolean isMandatory) throws ParameterException {
+        String paramValue = Convert.emptyToNull(req.getParameter(name));
+        if (paramValue == null) {
+            if (isMandatory) {
+                throw new ParameterException(missing(name));
+            }
+            return BigInteger.ZERO;
+        }
+        return new BigInteger(paramValue);
     }
 
     public static byte[] getBytes(HttpServletRequest req, String name, boolean isMandatory) throws ParameterException {
@@ -481,9 +472,31 @@ public final class ParameterParser {
     }
 
     public static String getSecretPhrase(HttpServletRequest req, boolean isMandatory) throws ParameterException {
-        String secretPhrase = Convert.emptyToNull(req.getParameter("secretPhrase"));
-        if (secretPhrase == null && isMandatory) {
-            throw new ParameterException(MISSING_SECRET_PHRASE);
+        return getSecretPhrase(req, null, isMandatory);
+    }
+
+    public static String getSecretPhrase(HttpServletRequest req, String prefix, boolean isMandatory) throws ParameterException {
+        String secretPhraseParam = prefix == null ? "secretPhrase" : (prefix + "SecretPhrase");
+        String secretPhrase = Convert.emptyToNull(req.getParameter(secretPhraseParam));
+        if (secretPhrase != null) {
+            return secretPhrase;
+        }
+        String[] sharedPieces = req.getParameterValues("sharedPiece");
+        if (sharedPieces == null || prefix != null) {
+            if (isMandatory) {
+                throw new ParameterException(MISSING_SECRET_PHRASE);
+            } else {
+                return null;
+            }
+        }
+        List<String> clientSharedPieces = Arrays.asList(sharedPieces);
+        long accountId = getAccountId(req, "sharedPieceAccount", false);
+        String sharedSecretAccount = Convert.rsAccount(accountId);
+        List<String> serverSharedPieces = Nxt.getStringListProperty("nxt.secretPhrasePieces." + sharedSecretAccount);
+        List<String> allSharedPieces = Stream.concat(clientSharedPieces.stream(), serverSharedPieces.stream()).distinct().collect(Collectors.toList());
+        secretPhrase = SecretSharingGenerator.combine(allSharedPieces.toArray(new String[]{}));
+        if (accountId != 0 && Account.getId(Crypto.getPublicKey(secretPhrase)) != accountId) {
+            throw new ParameterException(JSONResponses.error(String.format("Combined secret phrase does not reproduce secret phrase for account %s", sharedSecretAccount)));
         }
         return secretPhrase;
     }
@@ -495,7 +508,7 @@ public final class ParameterParser {
     public static byte[] getPublicKey(HttpServletRequest req, String prefix) throws ParameterException {
         String secretPhraseParam = prefix == null ? "secretPhrase" : (prefix + "SecretPhrase");
         String publicKeyParam = prefix == null ? "publicKey" : (prefix + "PublicKey");
-        String secretPhrase = Convert.emptyToNull(req.getParameter(secretPhraseParam));
+        String secretPhrase = getSecretPhrase(req, prefix, false);
         boolean isVoucher = "true".equalsIgnoreCase(req.getParameter("voucher"));
         if (secretPhrase == null || isVoucher) {
             try {
@@ -513,6 +526,26 @@ public final class ParameterParser {
         } else {
             return Crypto.getPublicKey(secretPhrase);
         }
+    }
+
+    public static List<byte[]> getPublicKeys(HttpServletRequest req, String name) throws ParameterException {
+        String[] paramValues = req.getParameterValues(name);
+        if (paramValues == null || paramValues.length == 0) {
+            throw new ParameterException(missing(name));
+        }
+        List<byte[]> publicKeys = new ArrayList<>();
+        for (String keyString : paramValues) {
+            for (String key : keyString.split("\\n")) {
+                byte[] publicKey = Convert.parseHexString(key.trim());
+                if (publicKey.length != 0) {
+                    if (!Crypto.isCanonicalPublicKey(publicKey)) {
+                        throw new ParameterException(incorrect(name));
+                    }
+                    publicKeys.add(publicKey);
+                }
+            }
+        }
+        return publicKeys;
     }
 
     public static Account getSenderAccount(HttpServletRequest req) throws ParameterException {

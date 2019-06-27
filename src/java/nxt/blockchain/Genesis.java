@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -40,7 +40,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-final class Genesis {
+public final class Genesis {
 
     static final byte[] generationSignature = Constants.isTestnet ?
             new byte[] {
@@ -77,7 +77,7 @@ final class Genesis {
                 byte[] publicKey = Convert.parseHexString((String)jsonPublicKey);
                 Account account = Account.addOrGetAccount(Account.getId(publicKey));
                 account.apply(publicKey);
-                if (count++ % 100 == 0) {
+                if (count++ % Constants.BATCH_COMMIT_SIZE == 0) {
                     Db.db.commitTransaction();
                     Db.db.clearCache();
                 }
@@ -89,30 +89,56 @@ final class Genesis {
     }
 
     private static void importBalances(MessageDigest digest) {
-        List<Chain> chains = new ArrayList<>(ChildChain.getAll());
+        List<Chain> chains = new ArrayList<>();
+        ChildChain.getAll().forEach(childChain -> {
+            if (childChain.isEnabled()) {
+                chains.add(childChain);
+            }
+        });
         chains.add(FxtChain.FXT);
         chains.sort(Comparator.comparingInt(Chain::getId));
         for (Chain chain : chains) {
-            int count = 0;
             try (InputStreamReader is = new InputStreamReader(new DigestInputStream(
                     ClassLoader.getSystemResourceAsStream("data/" + chain.getName() + (Constants.isTestnet ? "-testnet.json" : ".json")), digest), "UTF-8")) {
                 JSONObject chainBalances = (JSONObject) JSONValue.parseWithException(is);
-                Logger.logDebugMessage("Loading genesis amounts for " + chain.getName());
-                long total = 0;
-                for (Map.Entry<String, Long> entry : ((Map<String, Long>)chainBalances).entrySet()) {
-                    Account account = Account.addOrGetAccount(Long.parseUnsignedLong(entry.getKey()));
-                    account.addToBalanceAndUnconfirmedBalance(chain, null, null, entry.getValue());
-                    total += entry.getValue();
-                    if (count++ % 100 == 0) {
-                        Db.db.commitTransaction();
-                        Db.db.clearCache();
-                    }
-                }
-                Logger.logDebugMessage("Total balance %f %s", (double)total / chain.ONE_COIN, chain.getName());
+                loadBalances(chain, chainBalances);
             } catch (IOException|ParseException e) {
                 throw new RuntimeException("Failed to process genesis recipients accounts for " + chain.getName(), e);
             }
         }
+    }
+
+    public static void loadBalances(Chain chain, Map<String, Long> chainBalances) {
+        Logger.logDebugMessage("Loading balances for chain %s", chain.getName());
+        int count = 0;
+        long total = 0;
+        for (Map.Entry<String, Long> entry : chainBalances.entrySet()) {
+            long quantity = entry.getValue();
+            String key = entry.getKey();
+            Account account;
+            if (key.length() == 64) {
+                byte[] publicKey = Convert.parseHexString(key);
+                if (!Crypto.isCanonicalPublicKey(publicKey)) {
+                    Logger.logErrorMessage("Public key is not canonical: " + Convert.toHexString(publicKey));
+                    continue;
+                }
+                account = Account.addOrGetAccount(Account.getId(publicKey));
+                try {
+                    account.apply(publicKey);
+                } catch (IllegalStateException e) {
+                    Logger.logErrorMessage(String.format("Public key mismatch for account %s", Long.toUnsignedString(account.getId())), e);
+                }
+            } else {
+                account = Account.addOrGetAccount(Long.parseUnsignedLong(key));
+            }
+            account.addToBalanceAndUnconfirmedBalance(chain, null, null, quantity);
+            total += quantity;
+            if (count++ % Constants.BATCH_COMMIT_SIZE == 0) {
+                Db.db.commitTransaction();
+                Db.db.clearCache();
+            }
+        }
+        Logger.logDebugMessage("Total balance %f %s", (double)total / chain.ONE_COIN, chain.getName());
     }
 
     private static void importAliases(MessageDigest digest) {
@@ -128,7 +154,7 @@ final class Genesis {
                 String aliasURI = entry.getValue().get("uri");
                 long accountId = Long.parseUnsignedLong(entry.getValue().get("account"));
                 ignisAliasHome.importAlias(aliasId++, accountId, aliasName, aliasURI);
-                if (count++ % 100 == 0) {
+                if (count++ % Constants.BATCH_COMMIT_SIZE == 0) {
                     Db.db.commitTransaction();
                     Db.db.clearCache();
                 }
@@ -159,7 +185,7 @@ final class Genesis {
                     long quantityQNT = balanceEntry.getValue();
                     account.addToAssetAndUnconfirmedAssetBalanceQNT(null, null, assetId, quantityQNT);
                     total += quantityQNT;
-                    if (count++ % 100 == 0) {
+                    if (count++ % Constants.BATCH_COMMIT_SIZE == 0) {
                         Db.db.commitTransaction();
                         Db.db.clearCache();
                     }
@@ -186,7 +212,7 @@ final class Genesis {
                 Account account = Account.addOrGetAccount(accountId);
                 account.addToCurrencyAndUnconfirmedCurrencyUnits(null, null, currencyId, 1);
                 Currency.importCurrency(currencyId++, accountId, currencyCode, currencyName);
-                if (count++ % 100 == 0) {
+                if (count++ % Constants.BATCH_COMMIT_SIZE == 0) {
                     Db.db.commitTransaction();
                     Db.db.clearCache();
                 }
@@ -208,7 +234,7 @@ final class Genesis {
                 String name = entry.getValue().get("name");
                 String description = entry.getValue().get("description");
                 Account.getAccount(accountId).setAccountInfo(name, description);
-                if (count++ % 100 == 0) {
+                if (count++ % Constants.BATCH_COMMIT_SIZE == 0) {
                     Db.db.commitTransaction();
                     Db.db.clearCache();
                 }
@@ -238,7 +264,7 @@ final class Genesis {
                         Account.importProperty(propertyId++, recipientId, setterId, name, value);
                     }
                 }
-                if (count++ % 100 == 0) {
+                if (count++ % Constants.BATCH_COMMIT_SIZE == 0) {
                     Db.db.commitTransaction();
                     Db.db.clearCache();
                 }
@@ -263,7 +289,7 @@ final class Genesis {
                 int maxDuration = ((Long)entry.getValue().get("maxDuration")).intValue();
                 JSONArray whitelist = (JSONArray)entry.getValue().get("whitelist");
                 AccountRestrictions.PhasingOnly.importPhasingOnly(accountId, Convert.toArray(whitelist), quorum, maxFees, minDuration, maxDuration);
-                if (count++ % 100 == 0) {
+                if (count++ % Constants.BATCH_COMMIT_SIZE == 0) {
                     Db.db.commitTransaction();
                     Db.db.clearCache();
                 }

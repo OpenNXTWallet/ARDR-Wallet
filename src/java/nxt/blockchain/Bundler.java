@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -24,19 +24,12 @@ import nxt.crypto.Crypto;
 import nxt.db.DbIterator;
 import nxt.db.FilteringIterator;
 import nxt.peer.BundlerRate;
-import nxt.util.JSON;
+import nxt.util.Convert;
 import nxt.util.Logger;
+import nxt.util.security.BlockchainPermission;
 
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class Bundler {
@@ -155,9 +148,16 @@ public final class Bundler {
             int blockchainHeight = Nxt.getBlockchain().getHeight();
             long minChildFeeFQT = childTransaction.getMinimumFeeFQT(blockchainHeight);
             long childFee = childTransaction.getFee();
-            return BigInteger.valueOf(childFee).multiply(Constants.ONE_FXT_BIG_INTEGER)
-                    .compareTo(minRateNQTPerFXTBigInteger.multiply(BigInteger.valueOf(minChildFeeFQT))) >= 0
-                    && filters.stream().allMatch(filter -> filter.ok(bundler, childTransaction));
+            BigInteger minParentFeeFQT = minRateNQTPerFXTBigInteger.multiply(BigInteger.valueOf(minChildFeeFQT));
+            if (BigInteger.valueOf(childFee).multiply(Constants.ONE_FXT_BIG_INTEGER).compareTo(minParentFeeFQT) < 0) {
+                Logger.logInfoMessage("Bundler not bundling child transaction %d:%s fee %d [FQT] lower than min required fee %d [FQT]",
+                        childTransaction.getChain().getId(),
+                        Convert.toHexString(childTransaction.getFullHash()),
+                        BigInteger.valueOf(childFee),
+                        minParentFeeFQT.divide(Constants.ONE_FXT_BIG_INTEGER));
+                return false;
+            }
+            return filters.stream().allMatch(filter -> filter.ok(bundler, childTransaction));
         }
 
         public long overpay(long feeFQT) {
@@ -216,11 +216,19 @@ public final class Bundler {
     private static final TransactionProcessorImpl transactionProcessor = TransactionProcessorImpl.getInstance();
 
     public static Bundler getBundler(ChildChain childChain, long accountId) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         Map<Long, Bundler> childChainBundlers = bundlers.get(childChain);
         return childChainBundlers == null ? null : childChainBundlers.get(accountId);
     }
 
     public static Filter createBundlingFilter(String name, String parameter) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         Filter filter;
         if (Bundler.bundlingFilter != null) {
             if (name != null && !name.equals(Bundler.bundlingFilter.getName())) {
@@ -247,8 +255,20 @@ public final class Bundler {
 
     public static Rule createBundlingRule(long minRateNQTPerFXT, long overpayFQTPerFXT,
                                           String feeCalculatorName, List<Filter> filters) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         if (feeCalculatorName == null || feeCalculatorName.isEmpty()) {
             feeCalculatorName = MinFeeCalculator.NAME;
+        }
+        if (bundlingFilter != null) {
+            if (filters.isEmpty()) {
+                filters = Collections.singletonList(bundlingFilter);
+            } else if (filters.size() != 1 || !filters.get(0).getClass().equals(Bundler.bundlingFilter.getClass())) {
+                throw new IllegalArgumentException("The enforced bundling filter is " + Bundler.bundlingFilter.getName() +
+                        ". Either use this filter, or change the nxt.bundlingFilter property");
+            }
         }
         FeeCalculator feeCalculator = availableFeeCalculators.get(feeCalculatorName);
         if (feeCalculator == null) {
@@ -261,12 +281,20 @@ public final class Bundler {
 
     public static synchronized Bundler addOrChangeBundler(ChildChain childChain, String secretPhrase,
                                                           long totalFeesLimitFQT, List<Rule> bundlingRules) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         Bundler bundler = new Bundler(childChain, secretPhrase, totalFeesLimitFQT, bundlingRules);
         bundler.runBundling();
         return bundler;
     }
 
     public static synchronized Bundler addBundlingRule(ChildChain childChain, String secretPhrase, Rule rule) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         long accountId = Account.getId(Crypto.getPublicKey(secretPhrase));
         Bundler bundler = getBundler(childChain, accountId);
         if (bundler != null) {
@@ -278,17 +306,29 @@ public final class Bundler {
     }
 
     public static List<Bundler> getAllBundlers() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         List<Bundler> allBundlers = new ArrayList<>();
         bundlers.values().forEach(childChainBundlers -> allBundlers.addAll(childChainBundlers.values()));
         return allBundlers;
     }
 
     public static List<Bundler> getChildChainBundlers(ChildChain childChain) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         Map<Long, Bundler> childChainBundlers = bundlers.get(childChain);
         return childChainBundlers == null ? Collections.emptyList() : new ArrayList<>(childChainBundlers.values());
     }
 
     public static List<Bundler> getAccountBundlers(long accountId) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         List<Bundler> accountBundlers = new ArrayList<>();
         bundlers.values().forEach(childChainBundlers -> {
             Bundler bundler = childChainBundlers.get(accountId);
@@ -300,6 +340,10 @@ public final class Bundler {
     }
 
     public static List<BundlerRate> getBundlerRates() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         if (bundlingFilter != null) {
             // do not advertise rates when using a custom filter
             return Collections.emptyList();
@@ -315,27 +359,51 @@ public final class Bundler {
     }
 
     public static Bundler stopBundler(ChildChain childChain, long accountId) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         Map<Long, Bundler> childChainBundlers = bundlers.get(childChain);
         return childChainBundlers == null ? null : childChainBundlers.remove(accountId);
     }
 
     public static void stopAccountBundlers(long accountId) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         bundlers.values().forEach(childChainBundlers -> childChainBundlers.remove(accountId));
     }
 
     public static void stopChildChainBundlers(ChildChain childChain) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         bundlers.remove(childChain);
     }
 
     public static void stopAllBundlers() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         bundlers.clear();
     }
 
     public static Collection<Filter> getAvailableFilters() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         return Collections.unmodifiableCollection(availableBundlingFilters.values());
     }
 
     public static Collection<FeeCalculator> getAvailableFeeCalculators() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("bundling"));
+        }
         return Collections.unmodifiableCollection(availableFeeCalculators.values());
     }
 
@@ -516,8 +584,10 @@ public final class Bundler {
         builder.timestamp(timestamp);
         ChildBlockFxtTransaction childBlockFxtTransaction = (ChildBlockFxtTransaction)builder.build(secretPhrase);
         childBlockFxtTransaction.validate();
+        /*
         Logger.logDebugMessage("Created ChildBlockFxtTransaction: " + Long.toUnsignedString(childBlockFxtTransaction.getId()) + " "
                 + JSON.toJSONString(childBlockFxtTransaction.getJSONObject()));
+        */
         return childBlockFxtTransaction;
     }
 

@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -45,6 +45,8 @@ import java.util.Locale;
 
 @SuppressWarnings("UnusedDeclaration")
 public final class Currency {
+    public static final String CURRENCY_FREEZE_HEIGHT_PROPERTY_PREFIX = "Freeze";
+    public static final String CURRENCY_MIGRATE_HEIGHT_PROPERTY_PREFIX = "Migrate";
 
     public enum Event {
         BEFORE_DISTRIBUTE_CROWDFUNDING, BEFORE_UNDO_CROWDFUNDING, BEFORE_DELETE
@@ -220,7 +222,10 @@ public final class Currency {
         Nxt.getBlockchainProcessor().addListener(new CrowdFundingListener(), BlockchainProcessor.Event.AFTER_BLOCK_APPLY);
     }
 
-    public static void init() {}
+    public static void init() {
+        CurrencyFreezeMonitor.init();
+        CurrencyMigrateMonitor.init();
+    }
 
     private final long currencyId;
 

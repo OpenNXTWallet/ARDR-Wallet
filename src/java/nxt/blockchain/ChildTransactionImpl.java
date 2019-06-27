@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -26,6 +26,7 @@ import nxt.account.PublicKeyAnnouncementAppendix;
 import nxt.ae.AssetControl;
 import nxt.crypto.Crypto;
 import nxt.db.DbUtils;
+import nxt.dbschema.Db;
 import nxt.messaging.EncryptToSelfMessageAppendix;
 import nxt.messaging.EncryptedMessageAppendix;
 import nxt.messaging.MessageAppendix;
@@ -253,7 +254,7 @@ public final class ChildTransactionImpl extends TransactionImpl implements Child
     public long getMinimumFeeFQT(int blockchainHeight) {
         long totalFee = super.getMinimumFeeFQT(blockchainHeight);
         if (referencedTransactionId != null) {
-            totalFee = Math.addExact(totalFee, blockchainHeight < Constants.LIGHT_CONTRACTS_BLOCK ? Constants.ONE_FXT : Constants.ONE_FXT / 100);
+            totalFee = Math.addExact(totalFee, Constants.ONE_FXT / 100);
         }
         return totalFee;
     }
@@ -301,6 +302,9 @@ public final class ChildTransactionImpl extends TransactionImpl implements Child
     public void validate() throws NxtException.ValidationException {
         try {
             super.validate();
+            if (!childChain.isEnabled()) {
+                throw new NxtException.NotYetEnabledException("Child chain " + childChain.getName() + " not yet enabled for accepting transactions");
+            }
             if (ChildTransactionType.findTransactionType(getType().getType(), getType().getSubtype()) == null) {
                 throw new NxtException.NotValidException("Invalid transaction type " + getType().getName() + " for ChildTransaction");
             }
@@ -445,6 +449,9 @@ public final class ChildTransactionImpl extends TransactionImpl implements Child
             pstmt.setShort(++i, getIndex());
             pstmt.setLong(++i, getFxtTransactionId());
             pstmt.executeUpdate();
+            if ((getIndex() + 1) % Constants.BATCH_COMMIT_SIZE == 0) {
+                Db.db.commitTransaction();
+            }
         }
     }
 

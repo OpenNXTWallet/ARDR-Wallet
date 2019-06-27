@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -97,7 +97,7 @@ public final class DGSDelivery extends CreateTransaction {
                         goodsIsText, discountNQT, Account.getPublicKey(buyerAccount.getId())) :
                 new DeliveryAttachment(purchase.getId(), encryptedGoods,
                         goodsIsText, discountNQT);
-        return createTransaction(req, sellerAccount, buyerAccount.getId(), 0, attachment);
+        return transactionParameters(req, sellerAccount, attachment).setRecipientId(buyerAccount.getId()).createTransaction();
 
     }
 

@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -30,6 +30,12 @@ public class TestCurrencyIssuance extends BlockchainTest {
     @Test
     public void issueCurrency() {
         issueCurrencyImpl();
+    }
+
+    @Test
+    public void issueCurrencyNoBroadcast() {
+        JSONObject issueCurrencyResponse = new Builder().param("broadcast", false).secretPhrase(null).param("publicKey", ALICE.getPublicKey()).build().invoke();
+        Assert.assertNull(issueCurrencyResponse.get("errorCode"));
     }
 
     public String issueCurrencyImpl() {
@@ -64,17 +70,19 @@ public class TestCurrencyIssuance extends BlockchainTest {
     public static class Builder extends APICall.Builder {
 
         private static int[] FEE_STEPS = new int[] { 0, 0, 0, 25000, 1000, 40};
+        public static final Tester creator = ALICE;
+        public static final int initialSupplyQNT = 100000;
 
         public Builder() {
             super("issueCurrency");
-            secretPhrase(ALICE.getSecretPhrase());
+            secretPhrase(creator.getSecretPhrase());
             chain(ChildChain.IGNIS.getId());
             param("name", "Test1");
             param("code", "TSXXX");
             param("description", "Test Currency 1");
             param("type", CurrencyType.EXCHANGEABLE.getCode());
             param("maxSupplyQNT", 100000);
-            param("initialSupplyQNT", 100000);
+            param("initialSupplyQNT", initialSupplyQNT);
             param("issuanceHeight", 0);
             param("algorithm", (byte)0);
             feeNQT(40 * ChildChain.IGNIS.ONE_COIN);

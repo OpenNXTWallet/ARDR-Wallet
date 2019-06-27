@@ -1,3 +1,18 @@
+/*
+ * Copyright © 2016-2019 Jelurida IP B.V.
+ *
+ * See the LICENSE.txt file at the top-level directory of this distribution
+ * for licensing information.
+ *
+ * Unless otherwise agreed in a custom licensing agreement with Jelurida B.V.,
+ * no part of this software, including this file, may be copied, modified,
+ * propagated, or distributed except according to the terms contained in the
+ * LICENSE.txt file.
+ *
+ * Removal or modification of this copyright notice is prohibited.
+ *
+ */
+
 package nxt.tools;
 
 import nxt.NxtException;
@@ -15,8 +30,10 @@ import nxt.http.callers.GetBundlerRatesCall;
 import nxt.http.callers.GetECBlockCall;
 import nxt.util.Convert;
 import nxt.util.JSON;
+import nxt.util.security.BlockchainPermission;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URL;
 import java.util.List;
 
@@ -38,6 +55,11 @@ public class LocalSigner {
      */
     public static JO signAndBroadcast(ChildChain childChain, long recipientId, Attachment attachment, String secretPhrase,
                                       long feeNQT, long feeRateNQTPerFXT, long minBundlerBalanceFXT, ChainTransactionId referencedTransaction, URL url) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("tools"));
+        }
+
         // Obtain existing block to reference
         GetECBlockCall getECBlockCall = GetECBlockCall.create().remote(url);
         JO ecBlock = getECBlockCall.call();
@@ -70,7 +92,7 @@ public class LocalSigner {
             }
 
             // Calculate the transaction fee and submit the transaction again
-            feeNQT = BigDecimal.valueOf(minimumFeeFQT).multiply(BigDecimal.valueOf(feeRateNQTPerFXT)).divide(BigDecimal.valueOf(childChain.ONE_COIN), BigDecimal.ROUND_HALF_EVEN).longValue();
+            feeNQT = BigDecimal.valueOf(minimumFeeFQT).multiply(BigDecimal.valueOf(feeRateNQTPerFXT)).divide(BigDecimal.valueOf(childChain.ONE_COIN), RoundingMode.HALF_EVEN).longValue();
         }
         builder = childChain.newTransactionBuilder(Crypto.getPublicKey(secretPhrase), 0, feeNQT,
                 (short)15, attachment)

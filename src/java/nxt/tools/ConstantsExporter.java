@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -21,6 +21,7 @@ import nxt.configuration.Setup;
 import nxt.http.GetConstants;
 import nxt.util.JSON;
 import nxt.util.ThreadPool;
+import nxt.util.security.BlockchainPermission;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -32,6 +33,11 @@ public class ConstantsExporter {
     private static final Object sync = new Object();
 
     public static void main(String[] args) throws InterruptedException {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("tools"));
+        }
+
         if (args.length != 1) {
             System.out.println("Usage: ConstantsExporter <destination constants.js file>");
             System.exit(1);
@@ -48,7 +54,7 @@ public class ConstantsExporter {
                         "}\n\n");
                 writer.write("NRS.constants.SERVER = ");
                 JSON.writeJSONString(GetConstants.getConstants(), writer);
-                writer.write("\n\n" +
+                writer.write(";\n\n" +
                         "if (isNode) {\n" +
                         "    module.exports = NRS.constants.SERVER;\n" +
                         "}\n");

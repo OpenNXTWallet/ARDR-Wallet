@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2018 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2019 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -215,13 +215,14 @@ var NRS = (function(NRS, $, undefined) {
 	};
 
 	NRS.setUnconfirmedNotifications = function() {
-        var count;
-        if (NRS.unconfirmedTransactions.length > NRS.itemsPerPage) {
-            count = String(NRS.itemsPerPage) + "+";
+        var countStr;
+		var count = NRS.getUnconfirmedTransactionsCount();
+		if (count > NRS.itemsPerPage) {
+            countStr = String(NRS.itemsPerPage) + "+";
         } else {
-            count = String(NRS.unconfirmedTransactions.length);
+            countStr = String(count);
         }
-        $('#unconfirmed_notification_counter').html(count);
+        $('#unconfirmed_notification_counter').html(countStr);
 		$('#unconfirmed_notification_menu').show();
 	};
 

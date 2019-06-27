@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -133,6 +133,11 @@ public interface BlockchainProcessor extends Observable<Block,BlockchainProcesso
 
         public BlockOfLowerDifficultyException(BlockImpl block) {
             super("Lower cumulative difficulty", block);
+        }
+
+        @Override
+        public String getMessage() {
+            return "Lower cumulative difficulty block " + super.block.getStringId();
         }
 
     }

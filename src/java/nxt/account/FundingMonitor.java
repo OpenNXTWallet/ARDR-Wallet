@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -34,6 +34,7 @@ import nxt.util.Convert;
 import nxt.util.Filter;
 import nxt.util.Listener;
 import nxt.util.Logger;
+import nxt.util.security.BlockchainPermission;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 import org.json.simple.parser.ParseException;
@@ -139,6 +140,10 @@ public final class FundingMonitor {
     private FundingMonitor(Chain chain, HoldingType holdingType, long holdingId, String property,
                                     long amount, long threshold, int interval,
                                     long accountId, String secretPhrase, long feeRateNQTPerFXT) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("fundingMonitor"));
+        }
         this.holdingType = holdingType;
         this.holdingId = holdingId;
         this.chain = chain;
@@ -264,9 +269,9 @@ public final class FundingMonitor {
      * @param   interval            Fund interval
      * @param   secretPhrase        Fund account secret phrase
      * @param   feeRateNQTPerFXT    Fee rate to use for the child chain transactions created
-     * @return                      TRUE if the monitor was started
+     * @return                      The monitor, null if unable to start
      */
-    public static boolean startMonitor(Chain chain, HoldingType holdingType, long holdingId, String property,
+    public static FundingMonitor startMonitor(Chain chain, HoldingType holdingType, long holdingId, String property,
                                     long amount, long threshold, int interval, String secretPhrase, long feeRateNQTPerFXT) {
         //
         // Initialize monitor processing if it hasn't been done yet.  We do this now
@@ -305,7 +310,7 @@ public final class FundingMonitor {
                 if (monitors.contains(monitor)) {
                     Logger.logDebugMessage(String.format("%s monitor already started for account %s, property '%s', holding %s, chain %s",
                             holdingType.name(), monitor.accountName, property, Long.toUnsignedString(holdingId), chain.getName()));
-                    return false;
+                    return null;
                 }
                 accountList.forEach(account -> {
                     List<MonitoredAccount> activeList = accounts.computeIfAbsent(account.accountId, k -> new ArrayList<>());
@@ -323,7 +328,7 @@ public final class FundingMonitor {
         } finally {
             Nxt.getBlockchain().readUnlock();
         }
-        return true;
+        return monitor;
     }
 
     /**
@@ -563,7 +568,7 @@ public final class FundingMonitor {
     @Override
     public boolean equals(Object obj) {
         boolean isEqual = false;
-        if (obj != null && (obj instanceof FundingMonitor)) {
+        if (obj instanceof FundingMonitor) {
             FundingMonitor monitor = (FundingMonitor)obj;
             if (holdingType == monitor.holdingType && holdingId == monitor.holdingId && chain == monitor.chain &&
                     property.equals(monitor.property) && accountId == monitor.accountId) {

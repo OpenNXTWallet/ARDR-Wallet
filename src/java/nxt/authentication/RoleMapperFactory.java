@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -16,6 +16,7 @@
 package nxt.authentication;
 
 import nxt.Constants;
+import nxt.util.security.BlockchainPermission;
 
 import java.util.EnumSet;
 
@@ -31,8 +32,8 @@ public class RoleMapperFactory {
         if (Constants.isPermissioned) {
             try {
                 Class<?> roleMapperClass = Class.forName("com.jelurida.blockchain.authentication.BlockchainRoleMapper");
-                roleMapper = (RoleMapper)roleMapperClass.newInstance();
-            } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
+                roleMapper = (RoleMapper)roleMapperClass.getConstructor().newInstance();
+            } catch (ReflectiveOperationException e) {
                 throw new ExceptionInInitializerError(e);
             }
         } else {
@@ -48,6 +49,10 @@ public class RoleMapperFactory {
      * @return                      Role mapper
      */
     public static RoleMapper getRoleMapper() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("authentication"));
+        }
         return roleMapper;
     }
 

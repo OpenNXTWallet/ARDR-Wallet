@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -25,6 +25,7 @@ import nxt.dbschema.Db;
 import nxt.util.Convert;
 import nxt.util.Filter;
 import nxt.util.ReadWriteUpdateLock;
+import nxt.util.security.BlockchainPermission;
 import nxt.voting.PhasingPollHome;
 
 import java.sql.Connection;
@@ -41,8 +42,13 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class BlockchainImpl implements Blockchain {
 
     private static final BlockchainImpl instance = new BlockchainImpl();
+    private static final BlockchainPermission blockchainPermission = new BlockchainPermission("getBlockchain");
 
     public static BlockchainImpl getInstance() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(blockchainPermission);
+        }
         return instance;
     }
 
@@ -131,6 +137,7 @@ public final class BlockchainImpl implements Blockchain {
     @Override
     public DbIterator<BlockImpl> getAllBlocks() {
         Connection con = null;
+        readLock();
         try {
             con = BlockDb.getConnection();
             PreparedStatement pstmt = con.prepareStatement("SELECT * FROM block ORDER BY db_id ASC");
@@ -138,12 +145,15 @@ public final class BlockchainImpl implements Blockchain {
         } catch (SQLException e) {
             DbUtils.close(con);
             throw new RuntimeException(e.toString(), e);
+        } finally {
+            readUnlock();
         }
     }
 
     @Override
     public DbIterator<BlockImpl> getBlocks(int from, int to) {
         Connection con = null;
+        readLock();
         try {
             con = BlockDb.getConnection();
             PreparedStatement pstmt = con.prepareStatement("SELECT * FROM block WHERE height <= ? AND height >= ? ORDER BY height DESC");
@@ -154,6 +164,8 @@ public final class BlockchainImpl implements Blockchain {
         } catch (SQLException e) {
             DbUtils.close(con);
             throw new RuntimeException(e.toString(), e);
+        } finally {
+            readUnlock();
         }
     }
 
@@ -165,6 +177,7 @@ public final class BlockchainImpl implements Blockchain {
     @Override
     public DbIterator<BlockImpl> getBlocks(long accountId, int timestamp, int from, int to) {
         Connection con = null;
+        readLock();
         try {
             con = BlockDb.getConnection();
             PreparedStatement pstmt = con.prepareStatement("SELECT * FROM block WHERE generator_id = ? "
@@ -180,6 +193,8 @@ public final class BlockchainImpl implements Blockchain {
         } catch (SQLException e) {
             DbUtils.close(con);
             throw new RuntimeException(e.toString(), e);
+        } finally {
+            readUnlock();
         }
     }
 
@@ -228,6 +243,7 @@ public final class BlockchainImpl implements Blockchain {
             return Collections.emptyList();
         }
         List<BlockImpl> result = new ArrayList<>();
+        readLock();
         try (Connection con = BlockDb.getConnection();
                 PreparedStatement pstmt = con.prepareStatement("SELECT * FROM block "
                         + "WHERE db_id > IFNULL ((SELECT db_id FROM block WHERE id = ?), " + Long.MAX_VALUE + ") "
@@ -241,6 +257,8 @@ public final class BlockchainImpl implements Blockchain {
             }
         } catch (SQLException e) {
             throw new RuntimeException(e.toString(), e);
+        } finally {
+            readUnlock();
         }
         return result;
     }
@@ -251,6 +269,7 @@ public final class BlockchainImpl implements Blockchain {
             return Collections.emptyList();
         }
         List<BlockImpl> result = new ArrayList<>();
+        readLock();
         try (Connection con = BlockDb.getConnection();
                 PreparedStatement pstmt = con.prepareStatement("SELECT * FROM block "
                         + "WHERE db_id > IFNULL ((SELECT db_id FROM block WHERE id = ?), " + Long.MAX_VALUE + ") "
@@ -269,6 +288,8 @@ public final class BlockchainImpl implements Blockchain {
             }
         } catch (SQLException e) {
             throw new RuntimeException(e.toString(), e);
+        } finally {
+            readUnlock();
         }
         return result;
     }
@@ -606,8 +627,8 @@ public final class BlockchainImpl implements Blockchain {
                         }
                         transaction.getChildTransactions().forEach(
                                 childTransaction -> {
-                                    if (filter.ok(transaction)) {
-                                        result.add(transaction);
+                                    if (filter.ok(childTransaction)) {
+                                        result.add(childTransaction);
                                     }
                                 }
                         );
@@ -631,8 +652,8 @@ public final class BlockchainImpl implements Blockchain {
             String phasingResultHeightFilter;
             if (height > 0) {
                 //use the block_timestamp index because there is no index on transaction.height
-                heightFilter = " transaction.block_timestamp = (SELECT timestamp FROM block WHERE height = ? LIMIT 1) ";
-                phasingResultHeightFilter = " phasing_poll_result.height = ? ";
+                heightFilter = " AND transaction.block_timestamp = (SELECT timestamp FROM block WHERE height = ? LIMIT 1) ";
+                phasingResultHeightFilter = " AND phasing_poll_result.height = ? ";
             } else {
                 if (senderId == 0 && recipientId == 0) {
                     throw new IllegalArgumentException("Sender or recipient expected");
@@ -643,8 +664,8 @@ public final class BlockchainImpl implements Blockchain {
                         throw new IllegalArgumentException("Number of confirmations required " + numberOfConfirmations
                                 + " exceeds current blockchain height " + getHeight());
                     }
-                    heightFilter = " transaction.height <= ? ";
-                    phasingResultHeightFilter = " phasing_poll_result.height <= ? ";
+                    heightFilter = " AND transaction.height <= ? ";
+                    phasingResultHeightFilter = " AND phasing_poll_result.height <= ? ";
                 } else {
                     heightFilter = null;
                     phasingResultHeightFilter = null;
@@ -654,17 +675,14 @@ public final class BlockchainImpl implements Blockchain {
             boolean hasTypeFilter = isChildChain && type >= 0 || !isChildChain && type < 0;
             StringBuilder accountAndTypeFilter = new StringBuilder();
             if (senderId != 0) {
-                accountAndTypeFilter.append(" transaction.sender_id = ? ");
+                accountAndTypeFilter.append(" AND transaction.sender_id = ? ");
             }
             if (recipientId != 0) {
-                accountAndTypeFilter.append(" transaction.recipient_id = ? ");
+                accountAndTypeFilter.append(" AND transaction.recipient_id = ? ");
             }
 
             if (hasTypeFilter) {
-                if (accountAndTypeFilter.length() > 0) {
-                    accountAndTypeFilter.append(" AND ");
-                }
-                accountAndTypeFilter.append(" transaction.type = ? ");
+                accountAndTypeFilter.append(" AND transaction.type = ? ");
                 if (subtype >= 0) {
                     accountAndTypeFilter.append(" AND transaction.subtype = ? ");
                 }
@@ -672,15 +690,12 @@ public final class BlockchainImpl implements Blockchain {
 
             StringBuilder buf = new StringBuilder();
             if (isChildChain) {
-                buf.append("SELECT transaction.*, transaction.height AS execution_height FROM transaction WHERE transaction.phased = FALSE AND ").append(accountAndTypeFilter);
+                buf.append("SELECT transaction.*, transaction.height AS execution_height FROM transaction WHERE transaction.phased = FALSE ").append(accountAndTypeFilter);
             } else {
-                buf.append("SELECT * FROM transaction_fxt AS transaction WHERE ").append(accountAndTypeFilter);
+                buf.append("SELECT * FROM transaction_fxt AS transaction WHERE TRUE ").append(accountAndTypeFilter);
             }
 
             if (heightFilter != null) {
-                if (accountAndTypeFilter.length() > 0) {
-                    buf.append(" AND ");
-                }
                 buf.append(heightFilter);
             }
 
@@ -689,12 +704,9 @@ public final class BlockchainImpl implements Blockchain {
                 buf.append(" JOIN phasing_poll_result ON transaction.id = phasing_poll_result.id ");
                 buf.append("  AND transaction.full_hash = phasing_poll_result.full_hash ");
                 buf.append(" WHERE transaction.phased = TRUE AND phasing_poll_result.approved = TRUE ");
-                buf.append("  AND ").append(accountAndTypeFilter);
+                buf.append(accountAndTypeFilter);
 
                 if (heightFilter != null) {
-                    if (accountAndTypeFilter.length() > 0) {
-                        buf.append(" AND ");
-                    }
                     buf.append(phasingResultHeightFilter);
                 }
                 buf.append("ORDER BY execution_height DESC, transaction_index DESC");

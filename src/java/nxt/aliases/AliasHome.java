@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -24,6 +24,8 @@ import nxt.db.DbIterator;
 import nxt.db.DbKey;
 import nxt.db.DbUtils;
 import nxt.db.VersionedEntityDbTable;
+import nxt.util.Listener;
+import nxt.util.Listeners;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -122,6 +124,7 @@ public final class AliasHome {
             offerTable.delete(offer);
         }
         aliasTable.delete(alias);
+        aliasListeners.notify(alias, Event.DELETE_ALIAS);
     }
 
     void addOrUpdateAlias(Transaction transaction, AliasAssignmentAttachment attachment) {
@@ -134,6 +137,7 @@ public final class AliasHome {
             alias.timestamp = Nxt.getBlockchain().getLastBlockTimestamp();
         }
         aliasTable.insert(alias);
+        aliasListeners.notify(alias, Event.SET_ALIAS);
     }
 
     public void importAlias(long id, long accountId, String aliasName, String aliasURI) {
@@ -197,7 +201,7 @@ public final class AliasHome {
 
         private void save(Connection con) throws SQLException {
             try (PreparedStatement pstmt = con.prepareStatement("MERGE INTO alias_offer (id, price, buyer_id, "
-                    + "height) KEY (id, height) VALUES (?, ?, ?, ?)")) {
+                    + "height, latest) KEY (id, height) VALUES (?, ?, ?, ?, TRUE)")) {
                 int i = 0;
                 pstmt.setLong(++i, this.aliasId);
                 pstmt.setLong(++i, this.priceNQT);
@@ -263,8 +267,8 @@ public final class AliasHome {
 
         private void save(Connection con) throws SQLException {
             try (PreparedStatement pstmt = con.prepareStatement("MERGE INTO alias (id, account_id, alias_name, alias_name_lower, "
-                    + "alias_uri, timestamp, height) KEY (id, height) "
-                    + "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
+                    + "alias_uri, timestamp, height, latest) KEY (id, height) "
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)")) {
                 int i = 0;
                 pstmt.setLong(++i, this.id);
                 pstmt.setLong(++i, this.accountId);
@@ -307,4 +311,17 @@ public final class AliasHome {
 
     }
 
+    private static final Listeners<Alias, Event> aliasListeners = new Listeners<>();
+
+    public enum Event {
+        SET_ALIAS, DELETE_ALIAS
+    }
+
+    public static boolean addListener(Listener<Alias> listener, Event eventType) {
+        return aliasListeners.addListener(listener, eventType);
+    }
+
+    public static boolean removeListener(Listener<Alias> listener, Event eventType) {
+        return aliasListeners.removeListener(listener, eventType);
+    }
 }

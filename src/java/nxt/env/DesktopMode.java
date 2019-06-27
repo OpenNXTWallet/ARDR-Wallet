@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -17,10 +17,13 @@
 package nxt.env;
 
 import nxt.util.Logger;
+import nxt.util.security.BlockchainPermission;
 
 import javax.swing.*;
 import java.io.File;
 import java.net.URI;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class DesktopMode implements RuntimeMode {
 
@@ -29,6 +32,11 @@ public class DesktopMode implements RuntimeMode {
 
     @Override
     public void init() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new BlockchainPermission("desktop"));
+        }
+
         LookAndFeel.init();
         desktopSystemTray = new DesktopSystemTray();
         SwingUtilities.invokeLater(desktopSystemTray::createAndShowGUI);
@@ -43,13 +51,17 @@ public class DesktopMode implements RuntimeMode {
 
     @Override
     public void launchDesktopApplication() {
-        Logger.logInfoMessage("Launching desktop wallet");
-        try {
-            desktopApplication = Class.forName("nxtdesktop.DesktopApplication");
-            desktopApplication.getMethod("launch").invoke(null);
-        } catch (ReflectiveOperationException e) {
-            Logger.logInfoMessage("nxtdesktop.DesktopApplication failed to launch", e);
-        }
+        Logger.logInfoMessage("Launching desktop wallet in a new thread");
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        executor.submit(() -> {
+            try {
+                desktopApplication = Class.forName("nxtdesktop.DesktopApplication");
+                desktopApplication.getMethod("launch").invoke(null);
+            } catch (ReflectiveOperationException e) {
+                Logger.logInfoMessage("nxtdesktop.DesktopApplication failed to launch", e);
+            }
+            Logger.logInfoMessage("Desktop wallet shutdown completed"); // We never reach this line
+        });
     }
 
     @Override

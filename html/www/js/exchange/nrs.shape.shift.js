@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2018 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2019 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -142,13 +142,13 @@ var NRS = (function(NRS, $) {
                             if (parseFloat(data.rate) == 0) {
                                 rate = "N/A";
                             } else {
-                                rate = NRS.invert(data.rate);
+                                rate = NRS.getInverse(data.rate);
                             }
                             if (parseFloat(data.quotedRate) == 0) {
                                 quotedRate = "N/A";
                                 diff = "N/A";
                             } else {
-                                quotedRate = NRS.invert(data.quotedRate);
+                                quotedRate = NRS.getInverse(data.quotedRate);
                                 diff = -100 * (quotedRate - rate) / rate;
                             }
                         } else {
@@ -757,7 +757,7 @@ var NRS = (function(NRS, $) {
                     return;
                 }
                 modal.find(".error_message").html("").hide();
-                rate.val(NRS.invert(data.success.quotedRate));
+                rate.val(NRS.getInverse(data.success.quotedRate));
                 fee.val(data.success.minerFee);
                 depositAmount.val(parseFloat(data.success.depositAmount));
                 depositAddress.html(data.success.deposit);

@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2018 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2019 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -66,7 +66,8 @@ var NRS = (function(NRS, $, undefined) {
         is_remote_node_ssl: true,
         validators_count: 3,
         bootstrap_nodes_count: 5,
-		chain: "2"
+		chain: "2",
+		camera_id: 0
     };
 	NRS.contacts = {};
 
@@ -477,7 +478,7 @@ var NRS = (function(NRS, $, undefined) {
 			}
 		} else {
 			if (NRS.account) {
-				NRS.getUnconfirmedTransactions(function(unconfirmedTransactions) {
+				NRS.loadUnconfirmedTransactions(function(unconfirmedTransactions) {
 					NRS.handleIncomingTransactions(unconfirmedTransactions, false);
 				});
 			}
@@ -1101,11 +1102,17 @@ var NRS = (function(NRS, $, undefined) {
 		}, function(response) {
             var connectedIndicator = $("#connected_indicator");
             if (response.peers && response.peers.length) {
+            	if (!NRS.peerConnect) {
+            		NRS.logConsole("Changing status from disconnected to connected");
+				}
 				NRS.peerConnect = true;
 				connectedIndicator.addClass("connected");
                 connectedIndicator.find("span").html($.t("Connected")).attr("data-i18n", "connected");
 				connectedIndicator.show();
 			} else {
+				if (NRS.peerConnect) {
+					NRS.logConsole("Changing status from connected to disconnected");
+				}
 				NRS.peerConnect = false;
 				connectedIndicator.removeClass("connected");
 				connectedIndicator.find("span").html($.t("Not Connected")).attr("data-i18n", "not_connected");
@@ -1148,7 +1155,7 @@ var NRS = (function(NRS, $, undefined) {
         });
     };
 
-    function getAccountBalances() {
+    NRS.getAccountBalances = function(callback) {
         // Currently there is no way to get balances for all chains, so we need to specify each chain separately
         var qs = [];
         for (var i = 1; i <= Object.keys(NRS.constants.CHAINS).length; i++) {
@@ -1159,7 +1166,10 @@ var NRS = (function(NRS, $, undefined) {
         NRS.sendRequest("getBalances", {
             "querystring": qs
         }, function (response) {
-            NRS.accountInfo["balances"] = response.balances;
+			NRS.accountInfo["balances"] = response.balances;
+			if (callback) {
+				callback();
+			}
         });
     }
 
@@ -1185,12 +1195,13 @@ var NRS = (function(NRS, $, undefined) {
 			"includeLessors": true,
 			"includeEffectiveBalance": true
 		}, function(response) {
-			var previousAccountInfo = NRS.accountInfo;
 			NRS.accountInfo = response;
 			if (response.errorCode) {
 				NRS.logConsole("Get account info error (" + response.errorCode + ") " + response.errorDescription);
 				$("#account_balance, #account_balance_sidebar, #account_currencies_balance, #account_nr_currencies, #account_purchase_count, #account_pending_sale_count, #account_completed_sale_count, #account_message_count, #account_alias_count").html("0");
-                NRS.updateDashboardMessage();
+				NRS.isLeased = NRS.isAccountLeased();
+                NRS.updateDashboardLeasingStatus();
+				NRS.updateDashboardMessage();
                 if (NRS.isParentChain() || !NRS.isDisplayOptionalDashboardTiles()) {
                 	hideOptionalDashboardTiles();
 				} else {
@@ -1211,7 +1222,7 @@ var NRS = (function(NRS, $, undefined) {
                     $("#account_balance, #account_balance_sidebar").html(NRS.formatStyledAmount(balance.unconfirmedBalanceNQT));
                     NRS.accountInfo = $.extend({}, NRS.accountInfo, balance);
                 });
-                getAccountBalances();
+                NRS.getAccountBalances();
                 if (response.forgedBalanceFQT) {
                     $("#account_forged_balance").html(NRS.formatStyledAmount(response.forgedBalanceFQT));
                 } else {
@@ -1459,23 +1470,8 @@ var NRS = (function(NRS, $, undefined) {
                     hideOptionalDashboardTiles();
                 }
 
-                var leasingChange = false;
-				if (NRS.lastBlockHeight) {
-					var isLeased = NRS.lastBlockHeight >= NRS.accountInfo.currentLeasingHeightFrom;
-					if (isLeased != NRS.isLeased) {
-						leasingChange = true;
-						NRS.isLeased = isLeased;
-					}
-				}
-
-				if (leasingChange ||
-					(response.currentLeasingHeightFrom != previousAccountInfo.currentLeasingHeightFrom) ||
-					(response.lessors && !previousAccountInfo.lessors) ||
-					(!response.lessors && previousAccountInfo.lessors) ||
-					(response.lessors && previousAccountInfo.lessors && response.lessors.sort().toString() != previousAccountInfo.lessors.sort().toString())) {
-					NRS.updateAccountLeasingStatus();
-				}
-
+				NRS.isLeased = NRS.isAccountLeased();
+                NRS.updateDashboardLeasingStatus();
 				NRS.updateAccountControlStatus();
 
                 var accountName = $("#account_name");
@@ -1564,7 +1560,6 @@ var NRS = (function(NRS, $, undefined) {
     };
 
 	NRS.updateAccountLeasingStatus = function() {
-		var accountLeasingLabel = "";
 		var accountLeasingStatus = "";
 		var nextLesseeStatus = "";
 		if (NRS.accountInfo.nextLeasingHeightFrom < NRS.constants.MAX_INT_JAVA) {
@@ -1576,7 +1571,6 @@ var NRS = (function(NRS, $, undefined) {
 		}
 
 		if (NRS.lastBlockHeight >= NRS.accountInfo.currentLeasingHeightFrom) {
-			accountLeasingLabel = $.t("leased_out");
 			accountLeasingStatus = $.t("balance_is_leased_out", {
 				"blocks": String(NRS.accountInfo.currentLeasingHeightTo - NRS.lastBlockHeight).escapeHTML(),
 				"end": NRS.escapeRespStr(NRS.accountInfo.currentLeasingHeightTo),
@@ -1584,7 +1578,6 @@ var NRS = (function(NRS, $, undefined) {
 			});
 			$("#lease_balance_message").html($.t("balance_leased_out_help"));
 		} else if (NRS.lastBlockHeight < NRS.accountInfo.currentLeasingHeightTo) {
-			accountLeasingLabel = $.t("leased_soon");
 			accountLeasingStatus = $.t("balance_will_be_leased_out", {
 				"blocks": String(NRS.accountInfo.currentLeasingHeightFrom - NRS.lastBlockHeight).escapeHTML(),
 				"start": NRS.escapeRespStr(NRS.accountInfo.currentLeasingHeightFrom),
@@ -1603,14 +1596,10 @@ var NRS = (function(NRS, $, undefined) {
 		//no reed solomon available? do it myself? todo
         var accountLessorTable = $("#account_lessor_table");
         if (NRS.accountInfo.lessors) {
-			if (accountLeasingLabel) {
-				accountLeasingLabel += ", ";
+			if (accountLeasingStatus) {
 				accountLeasingStatus += "<br /><br />";
 			}
 
-			accountLeasingLabel += $.t("x_lessor", {
-				"count": NRS.accountInfo.lessors.length
-			});
 			accountLeasingStatus += $.t("x_lessor_lease", {
 				"count": NRS.accountInfo.lessors.length
 			});
@@ -1621,6 +1610,9 @@ var NRS = (function(NRS, $, undefined) {
 				var lessor = NRS.accountInfo.lessorsRS[i];
 				var lessorInfo = NRS.accountInfo.lessorsInfo[i];
 				var blocksLeft = lessorInfo.currentHeightTo - NRS.lastBlockHeight;
+				var blockTime = NRS.isTestNet ? 60 / NRS.constants.TESTNET_ACCELERATION : 60;
+				var timeLeftMs = 1000 * blockTime * blocksLeft;
+				var expirationTime = new Date(Date.now() + timeLeftMs).toLocaleString();
 				var blocksLeftTooltip = "From block " + lessorInfo.currentHeightFrom + " to block " + lessorInfo.currentHeightTo;
 				var nextLessee = "Not set";
 				var nextTooltip = "Next lessee not set";
@@ -1635,6 +1627,7 @@ var NRS = (function(NRS, $, undefined) {
 					"<td>" + NRS.getAccountLink({ lessorRS: lessor }, "lessor") + "</td>" +
 					"<td>" + NRS.escapeRespStr(lessorInfo.effectiveBalanceFXT) + "</td>" +
 					"<td><label>" + String(blocksLeft).escapeHTML() + " <i class='fa fa-question-circle show_popover' data-toggle='tooltip' title='" + blocksLeftTooltip + "' data-placement='right' style='color:#4CAA6E'></i></label></td>" +
+					"<td>" + expirationTime + "</td>" +
 					"<td><label>" + String(nextLessee).escapeHTML() + " <i class='fa fa-question-circle show_popover' data-toggle='tooltip' title='" + nextTooltip + "' data-placement='right' style='color:#4CAA6E'></i></label></td>" +
 				"</tr>";
 			}
@@ -1647,18 +1640,43 @@ var NRS = (function(NRS, $, undefined) {
 			$("#account_lessor_container").hide();
 		}
 
+		if (accountLeasingStatus) {
+			$("#account_leasing_status").html(accountLeasingStatus).show();
+		} else {
+			$("#account_leasing_status").hide();
+		}		
+	};
+
+	NRS.updateDashboardLeasingStatus = function() {
+		const accountLeasingLabel = NRS.generateAccountLeasingLabel();
 		if (accountLeasingLabel && NRS.isParentChain()) {
 			$("#account_leasing").html(accountLeasingLabel).show();
 		} else {
 			$("#account_leasing").hide();
 		}
-
-		if (accountLeasingStatus) {
-			$("#account_leasing_status").html(accountLeasingStatus).show();
-		} else {
-			$("#account_leasing_status").hide();
-		}
 	};
+
+	NRS.generateAccountLeasingLabel = function() {
+		var accountLeasingLabel = "";
+		if (NRS.isLeased) {
+			accountLeasingLabel = $.t("leased_out");
+		} else if (NRS.lastBlockHeight < NRS.accountInfo.currentLeasingHeightTo) {
+			accountLeasingLabel = $.t("leased_soon");
+		}
+		if (NRS.accountInfo.lessors) {
+			if (accountLeasingLabel) {
+				accountLeasingLabel += ", ";
+			}
+			accountLeasingLabel += $.t("x_lessor", {
+				"count": NRS.accountInfo.lessors.length
+			});
+		}
+		return accountLeasingLabel;
+	};
+
+	NRS.isAccountLeased = function() {
+		return NRS.lastBlockHeight >= NRS.accountInfo.currentLeasingHeightFrom && NRS.lastBlockHeight <= NRS.accountInfo.currentLeasingHeightTo;
+	}
 
 	NRS.updateAccountControlStatus = function() {
 		var onNoPhasingOnly = function() {

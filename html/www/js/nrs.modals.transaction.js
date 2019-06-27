@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2018 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2019 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -126,7 +126,7 @@ var NRS = (function (NRS, $, undefined) {
                 phasingDetails.quorum = phasingParams.phasingQuorum;
                 phasingDetails.minBalance = phasingParams.phasingMinBalance;
         }
-        var phasingHoldingLink = NRS.getHoldingLink(phasingParams.phasingHolding, phasingParams.phasingVotingModel);
+        var phasingHoldingLink = NRS.getVotingModelHoldingLink(phasingParams.phasingHolding, phasingParams.phasingVotingModel);
         if (votingModel == NRS.constants.VOTING_MODELS.ASSET) {
             phasingDetails.asset_formatted_html = phasingHoldingLink;
         } else if (votingModel == NRS.constants.VOTING_MODELS.CURRENCY) {
@@ -186,7 +186,9 @@ var NRS = (function (NRS, $, undefined) {
         $("#transaction_info_data").html(transaction.chain + ":" + transaction.fullHash);
         try {
             var async = false;
-
+            var $transactionRawData = $("#transaction_raw_data");
+            $transactionRawData.html(JSON.stringify(transaction, null, 4));
+            hljs.highlightBlock($transactionRawData[0]);
             var transactionDetails = $.extend({}, transaction);
             delete transactionDetails.attachment;
             if (transactionDetails.referencedTransaction !== undefined) {
@@ -227,10 +229,6 @@ var NRS = (function (NRS, $, undefined) {
                 transactionDetails.fee = transactionDetails.feeNQT;
                 delete transactionDetails.feeNQT;
             }
-            if (transactionDetails.executionHeight !== undefined) {
-                transactionDetails.execution_height_formatted_html = NRS.getBlockLink(transactionDetails.executionHeight);
-                delete transactionDetails.executionHeight;
-            }
             $("#transaction_info_tab_link").tab("show");
 
             $("#transaction_info_details_table").find("tbody").empty().append(NRS.createInfoTable(transactionDetails, { fixed: true, chain: transaction.chain }));
@@ -256,10 +254,13 @@ var NRS = (function (NRS, $, undefined) {
                 $("#transaction_info_modal_add_as_contact").removeAttr('disabled');
             }
             var approveTransactionButton = $("#transaction_info_modal_approve_transaction");
+            var revealSecretButton = $("#transaction_info_modal_reveal_secret");
             if (!transaction.attachment || !transaction.block ||
                 !transaction.attachment.phasingFinishHeight ||
-                transaction.attachment.phasingFinishHeight <= NRS.lastBlockHeight) {
+                transaction.attachment.phasingFinishHeight <= NRS.lastBlockHeight ||
+                transaction.approved) {
                 approveTransactionButton.attr('disabled', 'disabled');
+                revealSecretButton.attr('disabled', 'disabled');
             } else {
                 approveTransactionButton.removeAttr('disabled');
                 approveTransactionButton.data("chain", transaction.chain);
@@ -267,6 +268,7 @@ var NRS = (function (NRS, $, undefined) {
                 approveTransactionButton.data("timestamp", transaction.timestamp);
                 approveTransactionButton.data("minBalanceFormatted", "");
                 approveTransactionButton.data("votingmodel", transaction.attachment.phasingVotingModel);
+                revealSecretButton.removeAttr('disabled');
             }
             var bundleButton = $("#transaction_info_modal_bundle");
             if (transaction.chain == "1" || transaction.confirmations !== undefined || transaction.isBundled) {
@@ -288,6 +290,14 @@ var NRS = (function (NRS, $, undefined) {
                 var phasingDetails = {};
                 phasingDetails.finishHeight = finishHeight;
                 phasingDetails.finishIn = ((finishHeight - NRS.lastBlockHeight) > 0) ? (finishHeight - NRS.lastBlockHeight) + " " + $.t("blocks") : $.t("finished");
+                if (transactionDetails.executionHeight !== undefined) {
+                    phasingDetails.execution_height_formatted_html = NRS.getBlockLink(transactionDetails.executionHeight);
+                    delete transactionDetails.executionHeight;
+                    phasingDetails.result = transactionDetails.result;
+                    delete transactionDetails.result;
+                    phasingDetails.approved = transactionDetails.approved;
+                    delete transactionDetails.approved;
+                }
                 NRS.getPhasingDetails(phasingDetails, transaction.attachment);
                 $("#phasing_info_details_table").find("tbody").empty().append(NRS.createInfoTable(phasingDetails, { fixed: true, chain: transaction.chain }));
                 $("#phasing_info_details_link").show();
@@ -344,7 +354,7 @@ var NRS = (function (NRS, $, undefined) {
                             fieldsToDecrypt.encryptedMessage = $.t("encrypted_message");
                         }
                         if (transaction.attachment.encryptToSelfMessage && NRS.account == transaction.sender) {
-                            fieldsToDecrypt.encryptToSelfMessage = $.t("note_to_self");
+                            fieldsToDecrypt.encryptToSelfMessage = $.t("note_to_self_initial_caps");
                         }
                         var options = {
                             "noPadding": true,
@@ -553,7 +563,10 @@ var NRS = (function (NRS, $, undefined) {
                     data["transaction" + (i + 1) + "_formatted_html"] =
                         NRS.getTransactionLink(phasedTransactions[i].transactionFullHash, false, phasedTransactions[i].chain);
                 }
-
+                var revealedSecrets = transaction.attachment.revealedSecrets;
+                for (i = 0; i < revealedSecrets.length; i++) {
+                    data["secret" + (i + 1)] = revealedSecrets[i];
+                }
                 infoTable.find("tbody").append(NRS.createInfoTable(data, { chain: transaction.chain }));
                 infoTable.show();
             } else if (NRS.isOfType(transaction, "AccountProperty")) {
@@ -773,6 +786,31 @@ var NRS = (function (NRS, $, undefined) {
                     "asset_formatted_html": NRS.getEntityLink({ request: "getAsset", key: "asset", id: transaction.attachment.asset })
                 };
                 NRS.getPhasingDetails(data, transaction.attachment.phasingControlParams);
+                infoTable.find("tbody").append(NRS.createInfoTable(data, { chain: transaction.chain }));
+                infoTable.show();
+            } else if (NRS.isOfType(transaction, "AssetProperty")) {
+                NRS.sendRequest("getAsset", {
+                    "asset": transaction.attachment.asset
+                }, function (asset) {
+                    data = {
+                        "type": $.t("set_asset_property"),
+                        "asset_formatted_html": NRS.getEntityLink({ request: "getAsset", key: "asset", id: transaction.attachment.asset }),
+                        "asset_name": asset.name,
+                        "property": transaction.attachment.property,
+                        "value": transaction.attachment.value
+                    };
+                    infoTable.find("tbody").append(NRS.createInfoTable(data, {chain: transaction.chain}));
+                    infoTable.show();
+                });
+            } else if (NRS.isOfType(transaction, "AssetPropertyDelete")) {
+                data = {
+                    "type": $.t("delete_asset_property"),
+                    // TODO currently we cannot use NRS.getEntityLink() here since there is no one parameter getProperty API
+                    // and we cannot pass more than once param to key and id. In addition we only have the 64 bit id of the
+                    // property not the full hash so we cannot load the setProperty transaction.
+                    // Will solve this one day
+                    "property": transaction.attachment.property
+                };
                 infoTable.find("tbody").append(NRS.createInfoTable(data, { chain: transaction.chain }));
                 infoTable.show();
             } else if (NRS.isOfType(transaction, "DigitalGoodsListing")) {
@@ -1410,7 +1448,7 @@ var NRS = (function (NRS, $, undefined) {
                             transactionInfoOutputBottom.append("<div style='height:5px'></div>");
                         }
                         if (transaction.attachment.encryptToSelfMessage && NRS.account == transaction.sender) {
-                            fieldsToDecrypt.encryptToSelfMessage = $.t("note_to_self");
+                            fieldsToDecrypt.encryptToSelfMessage = $.t("note_to_self_initial_caps");
                             if (!account) {
                                 account = transaction.sender;
                             }
@@ -1779,7 +1817,7 @@ var NRS = (function (NRS, $, undefined) {
         bundleTransactionModal.find('#bundle_transaction_child_fee').val(NRS.formatQuantity(feeNQT, NRS.getChainDecimals(chain)));
         bundleTransactionModal.find('#bundle_transaction_chain_name').html(NRS.getChain(chain).name);
         bundleTransactionModal.find('#bundle_transaction_chain_id').val(chain); // only necessary to validate local signing
-        bundleTransactionModal.find('input[name=fee_decimals]').val(NRS.getChain(1).decimals);
+        bundleTransactionModal.find('input[name=isParentChainTransaction]').val("1");
 
         $("#bundle_transaction_fee_coin").html(NRS.getParentChainName());
     });

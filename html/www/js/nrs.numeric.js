@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright © 2013-2016 The Nxt Core Developers.                             *
- * Copyright © 2016-2018 Jelurida IP B.V.                                     *
+ * Copyright © 2016-2019 Jelurida IP B.V.                                     *
  *                                                                            *
  * See the LICENSE.txt file at the top-level directory of this distribution   *
  * for licensing information.                                                 *
@@ -38,6 +38,21 @@ var NRS = (function (NRS, $) {
             priceNQT = new BigInteger(String(priceNQT));
         }
         return quantityQNT.multiply(priceNQT).toString();
+    };
+
+    var BIG_ZERO = new Big(0);
+    var BIG_ONE = new Big(1);
+
+    NRS.getInverse = function(rate, decimals) {
+        if (decimals === undefined) {
+            decimals = 8;
+        }
+        var bigRate = new Big(rate);
+        if (bigRate.eq(BIG_ZERO)) {
+            return "0";
+        }
+        var result = BIG_ONE.div(bigRate);
+        return result.toFixed(decimals);
     };
 
     NRS.calculatePercentage = function (a, b, rounding_mode) {
@@ -407,11 +422,23 @@ var NRS = (function (NRS, $) {
         return decimals;
     };
 
-    NRS.validateDecimals = function (maxFractionLength, charCode, val, e) {
+    // TODO only supports period as decimal position. Does not support comma
+    NRS.validateDecimals = function (maxFractionLength, charCode, val, caretPos, e) {
         if (maxFractionLength) {
             //allow 1 single period character
             if (charCode == 110 || charCode == 190) {
                 if (val.indexOf(".") != -1) {
+                    e.preventDefault();
+                    return false;
+                } else if (val && val.length - caretPos > maxFractionLength) {
+                    // inserting a dot when there are too many decimals after it
+                    // For example with two decimals and val 9876 inserting a dot after the 9
+                    var errorMessage = $.t("error_decimals", {
+                        "count": maxFractionLength
+                    });
+                    $.growl(errorMessage, {
+                        "type": "danger"
+                    });
                     e.preventDefault();
                     return false;
                 } else {
@@ -435,12 +462,16 @@ var NRS = (function (NRS, $) {
         }
         var input = val + String.fromCharCode(charCode);
         var mantissa = input.match(/\.(\d*)$/);
+        var decPos = input.indexOf(".");
+        var isCaretAfterDot = (decPos >= 0 && caretPos > decPos);
 
-        //only allow as many as there are decimals allowed..
+        // only allow as many as there are decimals allowed.
+        // allow typing to the left of the decimal position when all decimals are full
+        // example with 2 decimals and val 97.65 allow typing 8 after the 9
         var selectedText = NRS.getSelectedText();
-        if (mantissa && mantissa[1].length - selectedText.length > maxFractionLength) {
+        if (mantissa && mantissa[1].length - selectedText.length > maxFractionLength && isCaretAfterDot) {
             if (selectedText != val) {
-                var errorMessage = $.t("error_decimals", {
+                errorMessage = $.t("error_decimals", {
                     "count": maxFractionLength
                 });
                 $.growl(errorMessage, {
@@ -452,8 +483,8 @@ var NRS = (function (NRS, $) {
             }
         }
 
-        //numeric characters, left/right key, backspace, delete
-        if (charCode == 8 || charCode == 37 || charCode == 39 || charCode == 46 || (charCode >= 48 && charCode <= 57 && !isNaN(String.fromCharCode(charCode)))) {
+        //numeric characters, left/right key, backspace, delete, home, end
+        if (charCode == 8 || charCode == 35 || charCode == 36 || charCode == 37 || charCode == 39 || charCode == 46 || (charCode >= 48 && charCode <= 57 && !isNaN(String.fromCharCode(charCode)))) {
             return true;
         } else {
             //comma

@@ -1,6 +1,6 @@
 /*
  * Copyright © 2013-2016 The Nxt Core Developers.
- * Copyright © 2016-2018 Jelurida IP B.V.
+ * Copyright © 2016-2019 Jelurida IP B.V.
  *
  * See the LICENSE.txt file at the top-level directory of this distribution
  * for licensing information.
@@ -48,17 +48,13 @@ public final class AccountPropertyAttachment extends Attachment.AbstractAttachme
 
     @Override
     protected int getMySize() {
-        return 1 + Convert.toBytes(property).length + 1 + Convert.toBytes(value).length;
+        return Account.PROPERTY_NAME_RW.getSize(property) + Account.PROPERTY_VALUE_RW.getSize(value);
     }
 
     @Override
     protected void putMyBytes(ByteBuffer buffer) {
-        byte[] property = Convert.toBytes(this.property);
-        byte[] value = Convert.toBytes(this.value);
-        buffer.put((byte)property.length);
-        buffer.put(property);
-        buffer.put((byte)value.length);
-        buffer.put(value);
+        Account.PROPERTY_NAME_RW.writeToBuffer(property, buffer);
+        Account.PROPERTY_VALUE_RW.writeToBuffer(value, buffer);
     }
 
     @Override

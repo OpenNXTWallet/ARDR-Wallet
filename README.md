@@ -1,4 +1,4 @@
-# ARDR Wallet: Version 2.2.5
+# ARDR Wallet: Version 2.2.6
 
 For some Automations Processes we need the ARDR Client on GitHub.
 Fell free to use it, to make things easier.
@@ -8,10 +8,7 @@ If you do not trust this Repository, you can find the actual Version here: https
 # Attention
 We are NOT affiliated with, funded, or in any way associated with the organization known as NXT FOUNDATION.
 
-You can find hosted Wallet under: https://ardr.open-nxt-wallet.eu:27876/
-
 ----
-
 # Welcome to Ardor! #
 
 ----

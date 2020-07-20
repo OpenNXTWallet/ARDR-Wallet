@@ -11,6 +11,7 @@ nxt.ce
 nxt.configuration
 nxt.crypto
 nxt.db
+nxt.db.pool
 nxt.dbschema
 nxt.dgs
 nxt.env
